@@ -1,279 +1,14 @@
 <?php
 class NotFoundException extends Exception {}
 
-abstract class Controller
-{
-    public $defaultAction;
-    public $data = array();
-
-    public function show404($backLink=false, $layout='layout')
-    {
-        header('404 Not Found');
-        $this->data['page_title'] = $this->data['window_title'] = _e('404 頁面不存在!');
-        $this->showError(_e('您所要檢視的頁面不存在！'), $backLink, $layout);
-    }
-    public function showError($content, $backLink=true, $layout='layout')
-    {
-        if ( $backLink ) {
-            $content = '<div>' . $content . '</div>'
-                . '<div class="alert-actions"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
-        }
-        $this->data['content'] = $content;
-        App::view()->render('error.html', $this->data, $layout);
-    }
-    public function loadModule($module, $createObj=true)
-    {
-        require_once CONTROLLER_PATH . 'modules/' . $module . '.php';
-        if ( $createObj ) {
-            $module = $module.'Module';
-            if ( is_array($createObj)) {
-                return new $module($this, $createObj);
-            }
-            return new $module($this, NULL);
-        }
-    }
-    public function appendTitle($title, $replacePageTitle=false, $pageTitleSep='::', $windowTitleSep='|')
-    {
-        if ( $replacePageTitle ) {
-            $this->data['page_title'] = $title;
-        } else {
-            $this->data['page_title'] .= ' ' . $pageTitleSep . ' ' . $title;
-        }
-        $this->data['window_title'] = $title . $windowTitleSep . $this->data['window_title'];
-    }
-
-} // END class
-abstract class Module
-{
-    protected $c;
-
-    public function __construct($controller, $members=NULL)
-    {
-        $this->c = $controller;
-        if ( $members !== NULL) {
-            foreach ( $members as $key => $value) {
-                $this->{$key} = $value;
-            }
-        }
-    }
-}
-abstract class Model
-{
-    protected $_primaryKey;
-    protected $_table;
-
-    /*
-    public function beforeVerify(&$field, &$input=NULL, $args) {}
-    public function beforeSave(&$fields, $args) {}
-    public function afterSave(&$fields, $args) {}
-    */
-
-    public function verify(&$fields, &$input=NULL, $args=NULL)
-    {
-        if ( method_exists($this, 'beforeVerify')) {
-            $this->beforeVerify($fields, $input, $args);
-        }
-        Validator::verify($fields, $this, $input);
-    }
-    public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
-    {
-        if ( $verify ) {
-            $this->verify($fields, $input, $args);
-        }
-
-        if ( method_exists($this, 'beforeSave')) {
-            $this->beforeSave($fields, $args);
-        }
-
-        if ( ! $this->hasPrimaryKey()) {
-            $this->insert($fields);
-        } else {
-            $this->update($fields);
-        }
-
-        if ( method_exists($this, 'afterSave')) {
-            $this->afterSave($fields, $args);
-        }
-    }
-    public function insert($fields)
-    {
-        $db = App::db();
-
-        if ( is_array($this->_primaryKey)) {
-            foreach ( $this->_primaryKey as $key) {
-                if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
-                    $fields[$key] = true;
-                }
-            }
-        }
-
-        $params = array();
-        if ( isset($this->rawValueFields)) {
-            $sql = DBHelper::toKeyInsertSql($this, $fields, $params, $this->rawValueFields);
-        } else {
-            $sql = DBHelper::toKeyInsertSql($this, $fields, $params);
-        }
-        $stmt = $db->prepare('INSERT INTO `' . $this->_table . '` ' . $sql);
-
-        DBHelper::bindArrayValue($stmt, $params);
-        $stmt->execute();
-
-        if ( ! is_array($this->_primaryKey)) {
-            $this->{$this->_primaryKey} = $db->lastInsertId();
-            return;
-        }
-        if ( in_array('id', $this->_primaryKey) && ! $this->id) {
-            $this->id = $db->lastInsertId();
-        }
-    }
-    public function update($fields)
-    {
-        $params = array();
-        if ( isset($this->rawValueFields)) {
-            $sql = DBHelper::toKeySetSql($this, $fields, $params, $this->rawValueFields);
-        } else {
-            $sql = DBHelper::toKeySetSql($this, $fields, $params);
-        }
-        if ( ! is_array($this->_primaryKey)) {
-            $where = array( $this->_primaryKey => $this->{$this->_primaryKey} );
-        } else {
-            $where = array();
-            foreach ( $this->_primaryKey as $key) {
-                $where[$key] = $this->{$key};
-            }
-        }
-        $stmt = App::db()->prepare('UPDATE `' . $this->_table . '` SET ' . $sql . ' WHERE ' . DBHelper::where($where));
-
-        DBHelper::bindArrayValue($stmt, $params);
-        $stmt->execute();
-    }
-    public function hasPrimaryKey()
-    {
-        if ( ! is_array($this->_primaryKey)) {
-            return !empty($this->{$this->_primaryKey});
-        }
-        foreach ($this->_primaryKey as $key ) {
-            if ( $this->{$key} === NULL ) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public static function count(Search $search)
-    {
-        $model = get_called_class();
-        $model = new $model;
-
-        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $model->_table . '` a ' . $search->sqlWhere() . ' LIMIT 1');
-        $stmt->execute($search->params);
-        return $stmt->fetchColumn();
-    }
-}
-class Search {
-
-    public $where = array();
-    public $params = array();
-
-    public function sqlWhere()
-    {
-        return sizeof($this->where) ? ' WHERE ' . implode(' AND ', $this->where) : '';
-    }
-}
-class View
-{
-    private $_dir;
-    private $_currentAddon;
-    private $_addons = array();
-
-    public function __construct($dir=NULL)
-    {
-        if ( $dir === NULL ) {
-            if ( ! defined('VIEW_PATH')) {
-                throw new Exception('VIEW_PATH 常數未定義.');
-            }
-            $dir = VIEW_PATH;
-        }
-        $this->_dir = $dir;
-    }
-    public function content($view_file)
-    {
-        return file_get_contents( $this->_dir . $view_file);
-    }
-    public function load($view_file)
-    {
-        extract($this->data);
-        if ( false === strpos($view_file, '.')) {
-            include $this->_dir . $view_file . '.html';
-        } else {
-            include $this->_dir . $view_file;
-        }
-    }
-    public function render($view_file, $data=array(), $layout='layout', $return=false)
-    {
-        $this->data = $data;
-
-        if ( file_exists($this->_dir . $layout . '_functions.php')) {
-            include $this->_dir . $layout . '_functions.php';
-        }
-
-        ob_start();
-        $this->load($view_file);
-        $content_html = ob_get_contents();
-        ob_end_clean();
-
-        if ( ! $layout ) {
-            if ( $return ) {
-                return $content_html;
-            }
-            echo $content_html;
-            return null;
-        }
-
-        ob_start();
-        $this->load($layout);
-        $layout_html = explode('{{content_html}}', ob_get_contents());
-        ob_end_clean();
-
-        if ( ! $return ) {
-            echo $layout_html[0];
-            echo $content_html;
-            if ( isset($layout_html[1]) ) {
-                echo $layout_html[1];
-            }
-            return;
-        }
-        return $layout_html[0] . $content_html . $layout_html[1];
-    }
-    public function startAddon($hook)
-    {
-        $this->_currentAddon = $hook;
-        if ( ! isset($this->_addons[$hook])) {
-            $this->_addons[$hook] = array();
-        }
-        ob_start();
-    }
-    public function endAddon()
-    {
-        $this->_addons[$this->_currentAddon][] = ob_get_contents();
-        ob_end_clean();
-    }
-    public function showAddon($hook)
-    {
-        if ( isset($this->_addons[$hook])) {
-            echo implode("\n", $this->_addons[$hook]);
-        }
-    }
-    public function hasAddon($hook)
-    {
-        return isset($this->_addons[$hook]);
-    }
-} // END class
 class App
 {
+    public static $id = 'frontend';
     public static $defaultController = 'home';
     public static $defaultAction = 'index';
     public static $userRole = 'anonymous';
+
+    private static $_urlsList = array();
 
     private static function _array2Obj($array)
     {
@@ -313,28 +48,27 @@ class App
         }
         return $db;
     }
-    public static function view()
+    public static function view($appId=NULL)
     {
-        return new View();
+        return new View($appId ? $appId : self::$id);
     }
-    public static function urls($urlBase=NULL, $paramName='q')
+    public static function urls($id='_primary', $urlBase=NULL, $paramName='q')
     {
-        static $urls = NULL;
-        if ( $urls === NULL) {
-            $urls = new SimpleUrl( $urlBase, $paramName );
+        if ( isset(self::$_urlsList[$id])) {
+            return self::$_urlsList[$id];
         }
-        return $urls;
+        return (self::$_urlsList[$id] = new Urls( $urlBase, $paramName ));
     }
-    public static function loadClass($class, $createObj=false)
+    public static function loadClass($class, $createObj=false, $appId=NULL)
     {
-        require_once LIB_PATH . $class . '.php';
+        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/classes/' . $class . '.php';
         if ( $createObj ) {
             return new $class;
         }
     }
-    public static function loadModel($model, $createObj=false)
+    public static function loadModel($model, $createObj=false, $appId=NULL)
     {
-        require_once MODEL_PATH . $model. '.php';
+        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/models/' . $model. '.php';
 
         if ( $createObj ) {
             return new $model;
@@ -395,18 +129,13 @@ class App
             $page_name = null;
         }
 
-        if ( '_' === $action{0} || in_array($action, array(
-            'show404', 'showError', 'prepareLayout', 'appendTitle', 'doSelectedAction', 'loadModule',
-        ))) {
+        if ( '_' === $action{0} ) {
             throw new NotFoundException(_e('頁面不存在'));
         }
         $class = camelize($page);
         $action = camelize($action, false);
 
-        if ( ! defined('CONTROLLER_PATH')) {
-            throw new Exception('CONTROLLER_PATH 常數未定義');
-        }
-        $controller_path = CONTROLLER_PATH . $class . '.php';
+        $controller_path = ROOT_PATH . ($appId ? $appId : self::$id) . '/controllers/' . $class . '.php';
 
         if ( ! file_exists($controller_path)) {
             throw new NotFoundException(_e('頁面不存在'));
@@ -415,7 +144,7 @@ class App
 
         $class .= 'Controller';
         $controller = new $class();
-        $controller->data['page_title'] = $controller->data['window_title'] = $page_name;
+        $controller->setTitle($page_name);
 
         if ( ! is_callable(array($controller, $action))) {
             if ( ! $controller->defaultAction ) {
@@ -435,6 +164,378 @@ class App
         }
     }
 } // END class
+abstract class Controller
+{
+    public $defaultAction;
+    public $data = array();
+
+    public function _prepareLayout($type=NULL)
+    {
+        $this->data = array_merge($this->data, array(
+            'conf' => App::conf(),
+            'urls' => App::urls()
+        ));
+    }
+    public function _show404($backLink=false, $layout='layout')
+    {
+        header('404 Not Found');
+        $this->data['page_title'] = $this->data['window_title'] = _e('404 頁面不存在!');
+        $this->_showError(_e('您所要檢視的頁面不存在！'), $backLink, $layout);
+    }
+    public function _showError($content, $backLink=true, $layout='layout')
+    {
+        if ( $backLink ) {
+            $content = '<div>' . $content . '</div>'
+                . '<div class="alert-actions"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
+        }
+        $this->data['content'] = $content;
+        $this->_prepareLayout();
+        App::view()->render('error.html', $this->data, compact('layout'));
+    }
+    public function _loadModule($module, $createObj=true, $appId=NULL)
+    {
+        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/modules/' . $module . '.php';
+        if ( $createObj ) {
+            $module = $module . 'Module';
+            if ( is_array($createObj)) {
+                return new $module($this, $createObj);
+            }
+            return new $module($this, NULL);
+        }
+    }
+    public function _setTitle($title)
+    {
+        $this->data['page_title'] = $this->data['window_title'] = $title;
+    }
+    public function _appendTitle($title, $sep = array())
+    {
+        $sep = array_merge(array( 'pageTitleSep' => '-', 'windowTitleSep' => ' / '), $sep);
+        $this->data['page_title'] .= ' ' . $sep['pageTitleSep'] . ' ' . $title;
+        $this->data['window_title'] = $title . $sep['windowTitleSep'] . $this->data['window_title'];
+    }
+
+} // END class
+class BaseController extends Controller
+{
+    public function api($segment=2, $module=NULL)
+    {
+        try {
+            $obj = ($module === NULL ? $this : $module);
+            if (
+                ! ($method = App::urls()->segment($segment)) ||
+                ! ($method = '_api' . camelize($method, true)) ||
+                ! is_callable(array($obj, $method))
+            ) {
+                throw new Exception(_e('未定義的呼叫接口'));
+            }
+            $response = $obj->{$method}();
+        } catch ( Exception $ex ) {
+            $response = array( 'error' => array( 'message' => $ex->getMessage() ) );
+        }
+        header('Content-Type: text/plain; charset="' . App::conf()->encoding . '"');
+        echo json_encode($response);
+    }
+    public function _doSelectedAction($module=NULL)
+    {
+        if ( ! empty($_POST['action'])) {
+            try {
+                $obj = $module === NULL ? $this : $module;
+                if ( empty($_POST['select']) || ! is_array($_POST['select'])) {
+                    throw new Exception(_e('尚未選擇資料'));
+                }
+                $method = '_selected' . $_POST['action'];
+                if ( ! method_exists($obj, $method)) {
+                    throw new Exception(_e('沒有這個動作'));
+                }
+                $obj->{$method}();
+                redirect($_SERVER['REQUEST_URI']);
+            } catch ( Exception $ex ) {
+                $this->data['error'] = $ex->getMessage();
+            }
+        }
+    }
+} // END class
+abstract class Module
+{
+    protected $c;
+
+    public function __construct($controller, $members=NULL)
+    {
+        $this->c = $controller;
+        if ( $members !== NULL) {
+            foreach ( $members as $key => $value) {
+                $this->{$key} = $value;
+            }
+        }
+    }
+}
+abstract class Model
+{
+    protected static $_primaryKey;
+    protected static $_table;
+
+    /*
+    public function beforeVerify(&$field, &$input=NULL, $args) {}
+    public function beforeSave(&$fields, $args) {}
+    public function afterSave(&$fields, $args) {}
+    */
+
+    public function verify(&$fields, &$input=NULL, $args=NULL)
+    {
+        if ( method_exists($this, 'beforeVerify')) {
+            $this->beforeVerify($fields, $input, $args);
+        }
+        Validator::verify($fields, $this, $input);
+    }
+    public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
+    {
+        if ( $verify ) {
+            $this->verify($fields, $input, $args);
+        }
+
+        if ( method_exists($this, 'beforeSave')) {
+            $this->beforeSave($fields, $args);
+        }
+
+        if ( ! $this->hasPrimaryKey()) {
+            $this->insert(array_keys($fields));
+        } else {
+            $this->update(array_keys($fields));
+        }
+
+        if ( method_exists($this, 'afterSave')) {
+            $this->afterSave($fields, $args);
+        }
+    }
+    public function insert($fields)
+    {
+        $db = App::db();
+        $model = get_class($this);
+
+        if ( is_array($model::$_primaryKey)) {
+            foreach ( $model::$_primaryKey as $key) {
+                if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
+                    $fields[$key] = true;
+                }
+            }
+        }
+
+        $params = array();
+        if ( isset($this->rawValueFields)) {
+            $sql = DBHelper::toKeyInsertSql($this, $fields, $params, $this->rawValueFields);
+        } else {
+            $sql = DBHelper::toKeyInsertSql($this, $fields, $params);
+        }
+        $stmt = $db->prepare('INSERT INTO `' . $model::_table . '` ' . $sql);
+
+        DBHelper::bindArrayValue($stmt, $params);
+        $stmt->execute();
+
+        if ( ! is_array($model::$_primaryKey)) {
+            $this->{$model::$_primaryKey} = $db->lastInsertId();
+            return;
+        }
+        if ( in_array('id', $model::$_primaryKey) && ! $this->id) {
+            $this->id = $db->lastInsertId();
+        }
+    }
+    public function update($fields)
+    {
+        $model = get_class($this);
+
+        $params = array();
+        if ( isset($this->rawValueFields)) {
+            $sql = DBHelper::toKeySetSql($this, $fields, $params, $this->rawValueFields);
+        } else {
+            $sql = DBHelper::toKeySetSql($this, $fields, $params);
+        }
+        if ( ! is_array($model::$_primaryKey)) {
+            $where = array( $model::$_primaryKey => $this->{$model::$_primaryKey} );
+        } else {
+            $where = array();
+            foreach ( $model::$_primaryKey as $key) {
+                $where[$key] = $this->{$key};
+            }
+        }
+        $stmt = App::db()->prepare('UPDATE `' . $model::$_table . '` SET ' . $sql . ' WHERE ' . DBHelper::where($where));
+
+        DBHelper::bindArrayValue($stmt, $params);
+        $stmt->execute();
+    }
+    public function delete()
+    {
+        $model = get_class($this);
+        $db = App::db();
+
+        if ( ! is_array($model::$_primaryKey)) {
+            $where = array( $model::$_primaryKey => $this->{$model::$_primaryKey} );
+        } else {
+            $where = array();
+            foreach ( $model::$_primaryKey as $key) {
+                $where[$key] = $this->{$key};
+            }
+        }
+
+        App::db()->exec('DELETE FROM `' . $model::$_table . '` WHERE ' . DBHelper::where($where) );
+    }
+    public function hasPrimaryKey()
+    {
+        $model = get_class($this);
+        if ( ! is_array($model::$_primaryKey)) {
+            return !empty($this->{$model::$_primaryKey});
+        }
+        foreach ($model::$_primaryKey as $key ) {
+            if ( $this->{$key} === NULL ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static function getTable()
+    {
+        $model = get_called_class();
+        return $model::$_table;
+    }
+    public static function count(Search $search)
+    {
+        $model = get_called_class();
+
+        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $model::$_table . '` a ' . $search->sqlWhere() . ' LIMIT 1');
+        $stmt->execute($search->params);
+        return $stmt->fetchColumn();
+    }
+
+    public static function getList(Search $search, Pagination $pager)
+    {
+        $model = get_called_class();
+
+        $stmt = App::db()->prepare('SELECT ' . $model::selectInfo('list') . ' FROM `' . $model::$_table . '` a ' . $search->sqlWhere() . ' ORDER BY `id` DESC LIMIT ' . $pager->rowStart . ',' . $pager->rowsPerPage);
+        $stmt->execute($search->params);
+        return $stmt;
+    }
+
+    public static function getOne($search, $for=NULL)
+    {
+        $model = get_called_class();
+
+        if ( is_subclass_of($searchOrId, 'Search')) {
+            $where = $search->sqlWhere();
+            $params = $search->params();
+        } elseif ( is_array($search)) {
+            $where = ' WHERE ' . DBHelper::where($where);
+            $params = array();
+        } else {
+            $where = ' WHERE `' . $model::$_primaryKey . '` = ?';
+            $params = array($id);
+        }
+        $stmt = App::db()->prepare('SELECT ' . $model::selectInfo($for) . ' FROM `' . $model::$_table . '` a ' . $where . ' LIMIT 1');
+        $stmt->execute($params);
+        return $stmt->fetchObject($model);
+    }
+}
+class View
+{
+    private $_appId;
+    private $_currentAddon;
+    private $_addons = array();
+
+    public function __construct($appId)
+    {
+        $this->_appId = $appId;
+    }
+    private function getDir($appId=NULL)
+    {
+        return ROOT_PATH . ($appId ? $appId : $this->_appId) . '/views/';
+    }
+    public function content($viewFile, $appId=NULL)
+    {
+        return file_get_contents( $this->getDir($appId) . $viewFile);
+    }
+    public function load($viewFile, $appId=NULL)
+    {
+        extract($this->data);
+        if ( false === strpos($viewFile, '.')) {
+            include $this->getDir($appId) . $viewFile . '.html';
+        } else {
+            include $this->getDir($appId) . $viewFile;
+        }
+    }
+    public function render($viewFile, $data=array(), $options=array())
+    {
+        $layout = 'layout';
+        $appId = NULL;
+        $return = false;
+        extract($options, EXTR_IF_EXISTS);
+
+        $this->data = $data;
+
+        if ( file_exists($this->getDir($appId) . $layout . '_functions.php')) {
+            include $this->getDir($appId) . $layout . '_functions.php';
+        }
+
+        ob_start();
+        $this->load($viewFile, $appId);
+        $content_html = ob_get_contents();
+        ob_end_clean();
+
+        if ( ! $layout ) {
+            if ( $return ) {
+                return $content_html;
+            }
+            echo $content_html;
+            return null;
+        }
+
+        ob_start();
+        $this->load($layout, $appId);
+        $layout_html = explode('{{content_html}}', ob_get_contents());
+        ob_end_clean();
+
+        if ( ! $return ) {
+            echo $layout_html[0];
+            echo $content_html;
+            if ( isset($layout_html[1]) ) {
+                echo $layout_html[1];
+            }
+            return;
+        }
+        return $layout_html[0] . $content_html . $layout_html[1];
+    }
+    public function startAddon($hook)
+    {
+        $this->_currentAddon = $hook;
+        if ( ! isset($this->_addons[$hook])) {
+            $this->_addons[$hook] = array();
+        }
+        ob_start();
+    }
+    public function endAddon()
+    {
+        $this->_addons[$this->_currentAddon][] = ob_get_contents();
+        ob_end_clean();
+    }
+    public function showAddon($hook)
+    {
+        if ( isset($this->_addons[$hook])) {
+            echo implode("\n", $this->_addons[$hook]);
+        }
+    }
+    public function hasAddon($hook)
+    {
+        return isset($this->_addons[$hook]);
+    }
+} // END class
+class Search {
+
+    public $where = array();
+    public $params = array();
+
+    public function sqlWhere()
+    {
+        return sizeof($this->where) ? ' WHERE ' . implode(' AND ', $this->where) : '';
+    }
+}
 class DBHelper
 {
     public static function isUniqIn($table, $field, $value, $id=NULL)
@@ -501,7 +602,7 @@ class DBHelper
     public static function toSetSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $sql = array();
-        foreach ( $fields as $field => $info) {
+        foreach ( $fields as $field ) {
             $sql[] = '`'.$field.'` = ?';
             $params[] = $data->{$field};
         }
@@ -515,7 +616,7 @@ class DBHelper
     public static function toKeySetSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $sql = array();
-        foreach ( $fields as $field => $info) {
+        foreach ( $fields as $field ) {
             $sql[] = '`'.$field.'` = :'.$field;
             $params[':'.$field] = $data->{$field};
         }
@@ -529,7 +630,7 @@ class DBHelper
     public static function toInsertSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $columns = $values = array();
-        foreach ( $fields as $field => $info) {
+        foreach ( $fields as $field ) {
             $columns[] = $field;
             $values[] = '?';
             $params[] = $data->{$field};
@@ -545,7 +646,7 @@ class DBHelper
     public static function toKeyInsertSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $columns = $values = array();
-        foreach ( $fields as $field => $info) {
+        foreach ( $fields as $field ) {
             $columns[] = $field;
             $values[] = ':'.$field;
             $params[':'.$field] = $data->{$field};
@@ -584,7 +685,7 @@ class DBHelper
                     else
                         $param = FALSE;
 
-                    $req->bindValue("$key",$value,$param);
+                    $req->bindValue($key,$value,$param);
                 }
             }
         }
@@ -651,7 +752,7 @@ class Validator
         if ( ! isset($data->_new_files)) {
             $data->_new_files = array();
         }
-        App::loadClass('GdImage');
+        App::loadClass('GdImage', false, 'common');
 
         $fileKey = ! empty($opt['fileKey']) ? $opt['fileKey'] : $key;
         if ( empty($_FILES[$fileKey]['tmp_name'])) {
@@ -723,7 +824,7 @@ class Validator
             return;
         }
 
-        App::loadClass('Upload');
+        App::loadClass('Upload', false, 'common');
 
         $uploader = new Upload($fileKey, $opt['dir']);
 
@@ -963,7 +1064,7 @@ class Validator
     }
 
 }
-class SimpleUrl
+class Urls
 {
     /**
      * 網址計算的基本位置 eg: /subfolder/
