@@ -1,5 +1,5 @@
 <?php
-App::loadClass('File', false, 'common');
+App::loadHelper('File', false, 'common');
 
 class Upload
 {

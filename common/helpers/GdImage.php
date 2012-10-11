@@ -826,7 +826,7 @@ class GdImage {
         if($img==Null)return;
 
         if (!file_exists($this->uploadPath)) {
-			App::loadClass('File', false, 'common');
+			App::loadHelper('File', false, 'common');
             $fileManager = new File(0777);
             $fileManager->create($this->uploadPath);
         }

@@ -59,9 +59,9 @@ class App
         }
         return (self::$_urlsList[$id] = new Urls( $urlBase, $paramName ));
     }
-    public static function loadClass($class, $createObj=false, $appId=NULL)
+    public static function loadHelper($class, $createObj=false, $appId=NULL)
     {
-        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/classes/' . $class . '.php';
+        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/helpers/' . $class . '.php';
         if ( $createObj ) {
             return new $class;
         }
@@ -752,7 +752,7 @@ class Validator
         if ( ! isset($data->_new_files)) {
             $data->_new_files = array();
         }
-        App::loadClass('GdImage', false, 'common');
+        App::loadHelper('GdImage', false, 'common');
 
         $fileKey = ! empty($opt['fileKey']) ? $opt['fileKey'] : $key;
         if ( empty($_FILES[$fileKey]['tmp_name'])) {
@@ -824,7 +824,7 @@ class Validator
             return;
         }
 
-        App::loadClass('Upload', false, 'common');
+        App::loadHelper('Upload', false, 'common');
 
         $uploader = new Upload($fileKey, $opt['dir']);
 
