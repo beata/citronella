@@ -113,6 +113,7 @@ function HtmlClean($value)
         ));
 
         $config->set('Attr.AllowedFrameTargets', array('_blank'));
+        $config->set('Cache', 'SerializerPath', ROOT_PATH . App::conf()->upload_dir . DIRECTORY_SEPARATOR . 'htmlpurifier');
 
 		$def = $config->getHTMLDefinition(true);
 		$def->addAttribute('table', 'align', 'Enum#left,center,right');

@@ -8,6 +8,7 @@ $config = array(
     'language_code' => 'zh-tw',
     'locale' => 'zh_TW.UTF-8',
     'enable_rewrite' => false,
+    'upload_dir' => 'uploads',
     'system_email' => 'noreply@localhost', // 系統的發信地址
     'site_name' => 'Site Name',
 
