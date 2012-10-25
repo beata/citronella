@@ -1,5 +1,20 @@
 <?php
 // HTTP Functions
+function is_ssl()
+{
+   if ( isset($_SERVER['HTTPS']) ) {
+       if ( 'on' == strtolower($_SERVER['HTTPS']) ) {
+           return true;
+       }
+       if ( '1' == $_SERVER['HTTPS'] ) {
+           return true;
+       }
+   }
+   if ( isset($_SERVER['SERVER_PORT']) && ( '443' == $_SERVER['SERVER_PORT'] ) ) {
+       return true;
+   }
+   return false;
+}
 function get_user_ip()
 {
     if (empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
@@ -7,6 +22,12 @@ function get_user_ip()
     }
     $ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
     return $ip[0];
+}
+function get_domain_url()
+{
+    $is_ssl = isset($_REQUEST['is_ssl']) ? $_REQUEST['is_ssl'] : is_ssl();
+    $protocol = $is_ssl ? 'https://' : 'http://';
+    return $protocol . $_SERVER['HTTP_HOST'];
 }
 /**
  * 網址重定向
@@ -25,6 +46,10 @@ function redirect($location, $exit=true, $code=302, $headerBefore=NULL, $headerA
             header($h);
         }
     }
+    if ( $_SERVER['IS_IIS'] && false === strpos($location, '://') ) {
+        $location = get_domain_url() . $location;
+    }
+
     header('Location: ' . $location, true, $code);
     if($headerAfter!==null){
         foreach($headerAfter as $h){
@@ -82,10 +107,12 @@ function HtmlClean($value)
             'StyleAttribute',
             // Unsafe:
             //'Scripting', 'Object', 'Forms',
-            'Object', 'Iframe',
+            'Object', 'Iframe', 'Target',
             // Sorta legacy, but present in strict:
             'Name',
         ));
+
+        $config->set('Attr.AllowedFrameTargets', array('_blank'));
 
 		$def = $config->getHTMLDefinition(true);
 		$def->addAttribute('table', 'align', 'Enum#left,center,right');

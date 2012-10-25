@@ -31,42 +31,10 @@ define('ROOT_PATH', __DIR__ . DIRECTORY_SEPARATOR);
 define('SYS_PATH', ROOT_PATH . 'sys' . DIRECTORY_SEPARATOR);
 
 if ( ! defined('ROOT_URL')) {
-    define('ROOT_URL', rtrim(dirname($_SERVER['PHP_SELF']), '/') . '/');
+    define('ROOT_URL', rtrim(dirname($_SERVER['PHP_SELF']), '/.\\') . '/');
 }
 if ( ! defined('ASSETS_URL')) {
     define('ASSETS_URL', ROOT_URL . 'assets/');
-    define('ASSETS_PATH', ROOT_PATH . 'assets/');
+    define('ASSETS_PATH', ROOT_PATH . 'assets' . DIRECTORY_SEPARATOR);
 }
-
-
-// 設定日期時間函式使用台北時區
-date_default_timezone_set($config['timezone']);
-
-// 設定預設編碼
-setlocale(LC_ALL, $config['locale']);
-
 define('TRIM_MARKER', '&#8230;');
-if ( function_exists('mb_internal_encoding')) {
-    mb_internal_encoding($config['encoding']);
-}
-
-
-// REQUEST_URI in IIS
-if ( ! isset($_SERVER['REQUEST_URI']) ) {
-    $_SERVER['REQUEST_URI'] = substr($_SERVER['PHP_SELF'],1 );
-    if ( isset($_SERVER['QUERY_STRING'])) {
-        $_SERVER['REQUEST_URI'].='?'.$_SERVER['QUERY_STRING'];
-    }
-}
-
-// php5 - stripslashes_gpc
-if ( get_magic_quotes_gpc()) {
-    function stripslashes_gpc(&$value)
-    {
-        $value = stripslashes($value);
-    }
-    array_walk_recursive($_GET, 'stripslashes_gpc');
-    array_walk_recursive($_POST, 'stripslashes_gpc');
-    array_walk_recursive($_COOKIE, 'stripslashes_gpc');
-    array_walk_recursive($_REQUEST, 'stripslashes_gpc');
-}

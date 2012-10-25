@@ -167,4 +167,8 @@ class Upload
                 throw new Exception(__('上傳失敗！未知的錯誤'));
         }
     }
+    public function getFileType()
+    {
+        return $_FILES[$this->fieldName]['type'];
+    }
 }

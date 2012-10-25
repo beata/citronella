@@ -1,4 +1,5 @@
 <?php
+ini_set('gd.jpeg_ignore_warning', 1);
 /**
  * GdImage class file.
  *
@@ -120,7 +121,7 @@ class GdImage {
                 $img = imagecreatefromgif($file);
                 break;
             case 2:
-                $img = imagecreatefromjpeg($file);
+                $img = @imagecreatefromjpeg($file);
                 break;
             case 3:
                 $img = imagecreatefrompng($file);

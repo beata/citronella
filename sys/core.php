@@ -22,6 +22,39 @@ class App
         }
         return (object) $array;
     }
+    public static function boot()
+    {
+        $conf = App::conf();
+
+        date_default_timezone_set($conf->timezone);
+
+        setlocale(LC_ALL, $conf->locale);
+
+        if ( function_exists('mb_internal_encoding')) {
+            mb_internal_encoding($conf->encoding);
+        }
+
+        // REQUEST_URI in IIS
+        $_SERVER['IS_IIS'] = (false !== strpos(strtolower($_SERVER['SERVER_SOFTWARE']), 'microsoft-iis'));
+        if ( ! isset($_SERVER['REQUEST_URI']) ) {
+            $_SERVER['REQUEST_URI'] = $_SERVER['PHP_SELF'];
+            if ( isset($_SERVER['QUERY_STRING'])) {
+                $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
+            }
+        }
+
+        // php5 - stripslashes_gpc
+        if ( get_magic_quotes_gpc()) {
+            $stripslashes_gpc = create_function('&$value', '$value = stripslashes($value);');
+            array_walk_recursive($_GET, $stripslashes_gpc);
+            array_walk_recursive($_POST, $stripslashes_gpc);
+            array_walk_recursive($_COOKIE, $stripslashes_gpc);
+            array_walk_recursive($_REQUEST, $stripslashes_gpc);
+        }
+
+        $_REQUEST['is_ajax'] = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
+        $_REQUEST['is_ssl'] = is_ssl();
+    }
     public static function conf()
     {
         static $conf = NULL;
@@ -52,11 +85,12 @@ class App
     {
         return new View($appId ? $appId : self::$id);
     }
-    public static function urls($id='_primary', $urlBase=NULL, $paramName='q')
+    public static function urls($id='primary', $urlBase=NULL, $paramName='q')
     {
         if ( isset(self::$_urlsList[$id])) {
             return self::$_urlsList[$id];
         }
+        $urlBase = rtrim($urlBase, '/') . '/';
         return (self::$_urlsList[$id] = new Urls( $urlBase, $paramName ));
     }
     public static function loadHelper($class, $createObj=false, $appId=NULL)
@@ -84,7 +118,7 @@ class App
     {
         $urls = App::urls();
 
-        $_REQUEST['is_ajax'] = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
+        self::boot();
 
         if ( ! $page = $urls->segment(0)) {
             $page = $urls->segments[0] = self::$defaultController;
@@ -135,7 +169,7 @@ class App
         $class = camelize($page);
         $action = camelize($action, false);
 
-        $controller_path = ROOT_PATH . ($appId ? $appId : self::$id) . '/controllers/' . $class . '.php';
+        $controller_path = ROOT_PATH . self::$id . '/controllers/' . $class . '.php';
 
         if ( ! file_exists($controller_path)) {
             throw new NotFoundException(_e('頁面不存在'));
@@ -144,7 +178,7 @@ class App
 
         $class .= 'Controller';
         $controller = new $class();
-        $controller->setTitle($page_name);
+        $controller->_setTitle($page_name);
 
         if ( ! is_callable(array($controller, $action))) {
             if ( ! $controller->defaultAction ) {
@@ -190,11 +224,13 @@ abstract class Controller
         }
         $this->data['content'] = $content;
         $this->_prepareLayout();
-        App::view()->render('error.html', $this->data, compact('layout'));
+        $appId = 'common';
+        $layoutAppId = null;
+        App::view()->render('error', $this->data, compact('layout', 'appId', 'layoutAppId'));
     }
     public function _loadModule($module, $createObj=true, $appId=NULL)
     {
-        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/modules/' . $module . '.php';
+        require_once ROOT_PATH . ($appId ? $appId : App::$id) . '/modules/' . $module . '.php';
         if ( $createObj ) {
             $module = $module . 'Module';
             if ( is_array($createObj)) {
@@ -209,13 +245,13 @@ abstract class Controller
     }
     public function _appendTitle($title, $sep = array())
     {
-        $sep = array_merge(array( 'pageTitleSep' => '-', 'windowTitleSep' => ' / '), $sep);
+        $sep = array_merge(array( 'pageTitleSep' => '-', 'windowTitleSep' => '|'), $sep);
         $this->data['page_title'] .= ' ' . $sep['pageTitleSep'] . ' ' . $title;
         $this->data['window_title'] = $title . $sep['windowTitleSep'] . $this->data['window_title'];
     }
 
 } // END class
-class BaseController extends Controller
+abstract class BaseController extends Controller
 {
     public function api($segment=2, $module=NULL)
     {
@@ -304,7 +340,7 @@ abstract class Model
         }
 
         if ( method_exists($this, 'afterSave')) {
-            $this->afterSave($fields, $args);
+            $this->afterSave($fields, $input, $args);
         }
     }
     public function insert($fields)
@@ -326,7 +362,7 @@ abstract class Model
         } else {
             $sql = DBHelper::toKeyInsertSql($this, $fields, $params);
         }
-        $stmt = $db->prepare('INSERT INTO `' . $model::_table . '` ' . $sql);
+        $stmt = $db->prepare('INSERT INTO `' . $model::$_table . '` ' . $sql);
 
         DBHelper::bindArrayValue($stmt, $params);
         $stmt->execute();
@@ -365,7 +401,6 @@ abstract class Model
     public function delete()
     {
         $model = get_class($this);
-        $db = App::db();
 
         if ( ! is_array($model::$_primaryKey)) {
             $where = array( $model::$_primaryKey => $this->{$model::$_primaryKey} );
@@ -392,10 +427,33 @@ abstract class Model
         return true;
     }
 
+    public static function deleteAll($ids)
+    {
+        $model = get_called_class();
+        App::db()->exec('DELETE FROM `' . $model::$_table . '` WHERE `' . $model::$_primaryKey . '` ' . DBHelper::in($ids));
+    }
+    public static function updateAll($data, $ids)
+    {
+        $model = get_called_class();
+
+        $params = array();
+
+        $fields = array_keys($data);
+        $data = (object)$data;
+        $sql = DBHelper::toKeySetSql($data, $fields, $params);
+        $stmt = App::db()->prepare('UPDATE `' . $model::$_table . '` SET ' . $sql . ' WHERE `' . $model::$_primaryKey . '` ' . DBHelper::in($ids));
+        $stmt->execute($params);
+    }
+
     public static function getTable()
     {
         $model = get_called_class();
         return $model::$_table;
+    }
+    public static function getPrimaryKey()
+    {
+        $model = get_called_class();
+        return $model::$_primaryKey;
     }
     public static function count(Search $search)
     {
@@ -410,7 +468,7 @@ abstract class Model
     {
         $model = get_called_class();
 
-        $stmt = App::db()->prepare('SELECT ' . $model::selectInfo('list') . ' FROM `' . $model::$_table . '` a ' . $search->sqlWhere() . ' ORDER BY `id` DESC LIMIT ' . $pager->rowStart . ',' . $pager->rowsPerPage);
+        $stmt = App::db()->prepare('SELECT ' . $model::selectInfo('list') . ' FROM `' . $model::$_table . '` a ' . $search->sqlWhere() . ' ORDER BY `' . $pager->sortField . '` ' . $pager->sortDir . $pager->getSqlLimit());
         $stmt->execute($search->params);
         return $stmt;
     }
@@ -419,15 +477,15 @@ abstract class Model
     {
         $model = get_called_class();
 
-        if ( is_subclass_of($searchOrId, 'Search')) {
+        if ( is_object($search) && $search instanceof Search ) {
             $where = $search->sqlWhere();
-            $params = $search->params();
+            $params = $search->params;
         } elseif ( is_array($search)) {
-            $where = ' WHERE ' . DBHelper::where($where);
+            $where = ' WHERE ' . DBHelper::where($search);
             $params = array();
         } else {
             $where = ' WHERE `' . $model::$_primaryKey . '` = ?';
-            $params = array($id);
+            $params = array($search);
         }
         $stmt = App::db()->prepare('SELECT ' . $model::selectInfo($for) . ' FROM `' . $model::$_table . '` a ' . $where . ' LIMIT 1');
         $stmt->execute($params);
@@ -465,13 +523,14 @@ class View
     {
         $layout = 'layout';
         $appId = NULL;
+        $layoutAppId = NULL;
         $return = false;
         extract($options, EXTR_IF_EXISTS);
 
         $this->data = $data;
 
-        if ( file_exists($this->getDir($appId) . $layout . '_functions.php')) {
-            include $this->getDir($appId) . $layout . '_functions.php';
+        if ( file_exists($this->getDir($layoutAppId) . $layout . '_functions.php')) {
+            include $this->getDir($layoutAppId) . $layout . '_functions.php';
         }
 
         ob_start();
@@ -488,7 +547,7 @@ class View
         }
 
         ob_start();
-        $this->load($layout, $appId);
+        $this->load($layout, $layoutAppId);
         $layout_html = explode('{{content_html}}', ob_get_contents());
         ob_end_clean();
 
@@ -784,7 +843,9 @@ class Validator
             $data->{$key} = $input[$key] = '';
         }
         $method = empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
-        $filename = pathinfo($source, PATHINFO_FILENAME );
+        $info = pathinfo($source);
+        $filename = $info['filename'];
+        $ext = $info['extension'];
         if (
             $gd->{$method}(
                 $source,
@@ -806,7 +867,7 @@ class Validator
                         $filename . $suffix
                     )
                 ) {
-                    $data->_new_files[] = $opt['dir'] . $filename . $suffix;
+                    $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $ext;
                 }
             }
         }
@@ -845,6 +906,7 @@ class Validator
             }
 
             $data->{$key} = $input[$key] = $uploader->save();
+            $data->{$key.'_type'} = $input[$key.'_type'] = $uploader->getFileType();
 
             if ( ! is_array($data->{$key})) {
                 $data->_new_files[] = $opt['dir'] . DIRECTORY_SEPARATOR . $data->{$key};
@@ -1181,7 +1243,7 @@ class Urls
             }
         }
         if ( $fullurl ) {
-            return 'http://' . $_SERVER['SERVER_NAME'] . $url;
+            return get_domain_url() . $url;
         }
         return  $url;
     }
@@ -1196,19 +1258,7 @@ class Urls
      */
     public function redirect($routeuri, $exit=true, $code=302, $headerBefore=NULL, $headerAfter=NULL)
     {
-        if($headerBefore!==null){
-            foreach($headerBefore as $h){
-                header($h);
-            }
-        }
-        header('Location: ' . $this->urlto($routeuri), true, $code);
-        if($headerAfter!==null){
-            foreach($headerAfter as $h){
-                header($h);
-            }
-        }
-        if($exit)
-            exit;
+        redirect($this->urlto($routeuri), $exit, $code, $headerBefore, $headerAfter);
     }
     public function exceptionResponse($statusCode, $message)
     {

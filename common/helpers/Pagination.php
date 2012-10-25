@@ -65,8 +65,8 @@ class Pagination
             $this->{$key} = $value;
         }
         // paginate
-        $this->currentPage = isset($_GET[$this->param]) ? max(1, (int)$_GET[$this->param]) : 1;
-        $this->totalPages = ceil($this->totalRows / $this->rowsPerPage);
+        $this->totalPages = $this->rowsPerPage ? ceil($this->totalRows / $this->rowsPerPage) : 1;
+        $this->currentPage = isset($_GET[$this->param]) ? min($this->totalPages, max(1, (int)$_GET[$this->param])) : 1;
         $this->rowStart = max(0, ($this->currentPage - 1)) * $this->rowsPerPage;
         if ( isset($_GET[$this->paramSort]))
         {
@@ -87,6 +87,14 @@ class Pagination
             return $this->info;
         }
         return sprintf(_e($this->infoFormat), '<strong>' . $this->totalRows . '</strong>', '<strong>' . $this->totalPages . '</strong>');
+    }
+    public function getSqlLimit()
+    {
+        $limit = '';
+        if ( $this->rowsPerPage) {
+            $limit = ' LIMIT ' . $this->rowStart . ',' . $this->rowsPerPage;
+        }
+        return $limit;
     }
     public function pages($showInfo=false)
     {
