@@ -132,6 +132,13 @@ class App
         } else {
             require $aclConfigFile;
         }
+        if ( false === strpos($action, '.')) {
+            $_REQUEST['format'] = 'html';
+        } else {
+            $info = pathinfo($action);
+            $_REQUEST['format'] = $info['extension'];
+            $action = $info['filename'];
+        }
         if (
             '*' !== $acl[App::$userRole] &&
             ! isset($acl[App::$userRole][$page]) &&
