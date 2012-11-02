@@ -452,16 +452,6 @@ abstract class Model
         $stmt->execute($params);
     }
 
-    public static function getTable()
-    {
-        $model = get_called_class();
-        return $model::$_table;
-    }
-    public static function getPrimaryKey()
-    {
-        $model = get_called_class();
-        return $model::$_primaryKey;
-    }
     public static function count(Search $search)
     {
         $model = get_called_class();
@@ -497,6 +487,26 @@ abstract class Model
         $stmt = App::db()->prepare('SELECT ' . $model::selectInfo($for) . ' FROM `' . $model::$_table . '` a ' . $where . ' LIMIT 1');
         $stmt->execute($params);
         return $stmt->fetchObject($model);
+    }
+    public static function getTable()
+    {
+        $model = get_called_class();
+        return $model::$_table;
+    }
+    public static function setTable($table)
+    {
+        $model = get_called_class();
+        $model::$_table = $table;
+    }
+    public static function getPrimaryKey()
+    {
+        $model = get_called_class();
+        return $model::$_primaryKey;
+    }
+    public static function setPrimaryKey($column)
+    {
+        $model = get_called_class();
+        $model::$_primaryKey = $column;
     }
 }
 class View
