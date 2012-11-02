@@ -210,6 +210,8 @@ abstract class Controller
     public $defaultAction;
     public $data = array();
 
+    private $_baseUrl;
+
     public function _prepareLayout($type=NULL)
     {
         $this->data = array_merge($this->data, array(
