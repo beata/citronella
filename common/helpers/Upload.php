@@ -152,7 +152,7 @@ class Upload
         }
 
         $ext = pathinfo($filename, PATHINFO_EXTENSION);
-        $ext = '' === $ext ? '' : '.' . $ext;
+        $ext = '' === $ext ? '' : '.' . strtolower($ext);
 
         if ( true === $this->rename ) {
             $name = date('YmdHis') . '.' . mt_rand(1000, 9999);
