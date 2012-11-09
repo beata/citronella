@@ -833,22 +833,23 @@ class GdImage {
         }
 
         if(is_array($img['name'])===False){
-            $pic = strrpos($img['name'], '.');
-            $ext = strtolower(substr($img['name'], $pic+1));
+            $basename = basename($img['name']);
+            $ext = pathinfo($basename, PATHINFO_EXTENSION);
+            $ext = '' === $ext ? '' : '.' . strtolower($ext);
 
             if ($this->timeAsName){
-                $newName = time().'-'.mt_rand(1000,9999) . '.' . $ext;
+                $newName = time() . '-' . mt_rand(1000,9999) . $ext;
             }else{
-                $newName = $img['name'];
+                $newName = $basename;
             }
 
             if($rename=='')
                 $imgPath = $this->uploadPath . $newName;
             else
-                $imgPath = $this->uploadPath . $rename . '.' . $ext;
+                $imgPath = $this->uploadPath . $rename . $ext;
 
             if (move_uploaded_file($img['tmp_name'], $imgPath)){
-                return ($rename=='')? $newName : $rename. '.' . $ext;
+                return ($rename=='') ? $newName : $rename . $ext;
             }
         }
         else{
@@ -856,19 +857,21 @@ class GdImage {
             foreach($img['error'] as $k=>$error){
                 if(empty($img['name'][$k])) continue;
                 if ($error == UPLOAD_ERR_OK) {
-                   $pic = strrpos($img['name'][$k], '.');
-                   $ext = strtolower(substr($img['name'][$k], $pic+1));
+
+                    $basename = basename($img['name'][$k]);
+                    $ext = pathinfo($basename, PATHINFO_EXTENSION);
+                    $ext = '' === $ext ? '' : '.' . strtolower($ext);
 
                    if($this->timeAsName){
-                       $newName = time().'-'.mt_rand(1000,9999) . '_' . $k . '.' . $ext;
+                       $newName = time().'-'.mt_rand(1000,9999) . '_' . $k . $ext;
                    }else{
-                       $newName = $img['name'][$k];
+                       $newName = $basename;
                    }
 
                    if($rename=='')
                        $imgPath = $this->uploadPath . $newName;
                    else
-                       $imgPath = $this->uploadPath . $rename . '_' . $k . '.' . $ext;
+                       $imgPath = $this->uploadPath . $rename . '_' . $k . $ext;
 
                    if (move_uploaded_file($img['tmp_name'][$k], $imgPath)){
                        $uploadImagesPath[] = $newName;
@@ -936,14 +939,12 @@ class GdImage {
         if(!empty($_FILES[$filename])){
             $name = $_FILES[$filename]['name'];
             if(is_array($name)===False){
-                $n = strrpos($name, '.');
-                $ext = strtolower(substr($name, $n+1));
+                $ext = pathinfo($name, PATHINFO_EXTENSION);
                 return in_array($ext, $allowExt);
             }
             else{
                 foreach($name as $nm){
-                    $n = strrpos($nm, '.');
-                    $ext = strtolower(substr($nm, $n+1));
+                    $ext = pathinfo($nm, PATHINFO_EXTENSION);
                     if(!in_array($ext, $allowExt)){
                         return false;
                     }

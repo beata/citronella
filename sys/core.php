@@ -840,6 +840,13 @@ class Validator
         // file upload
         $gd = new GdImage( $opt['dir'], $opt['dir'] );
         $gd->generatedType = pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION);
+
+        if ( ! $gd->checkImageExtension($fileKey)) {
+            throw new Exception(sprintf(
+                    _e('%s: 圖片類型只能是 jpg, png, gif'),
+                    '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+        }
+
         if ( ! $gd->checkImageType($fileKey)) {
             throw new Exception(sprintf(
                     _e('%s: 圖片類型只能是 jpg, png, gif'),
