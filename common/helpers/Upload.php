@@ -7,15 +7,17 @@ class Upload
     public $destDir;
     public $rename = true; // true 代表系統重命名、false 代表保持上傳的檔名、字串代表指定新檔名
     public $maxSize; // in bytes
-    public $allowedTypes;
+    public $allowTypes;
+    public $denyFiles = array('php', 'phps', 'php3', 'php4', 'phtml');
 
-    public function __construct($fieldName, $destDir, $rename=true, $maxSize=NULL, $allowedTypes=NULL)
+    public function __construct($fieldName, $destDir, $rename=true, $maxSize=NULL, $allowTypes=NULL, $denyFiles=array('php', 'phps', 'php3', 'php4', 'phtml'))
     {
         $this->fieldName = $fieldName;
         $this->destDir = $destDir;
         $this->rename = $rename;
         $this->maxSize = $maxSize;
-        $this->allowedTypes = $allowedTypes;
+        $this->allowTypes = $allowTypes;
+        $this->denyFiles = $denyFiles;
     }
 	public function checkAll($idx=NULL)
 	{
@@ -27,8 +29,12 @@ class Upload
             $this->checkError( $_FILES[$this->fieldName]['error']);
             $this->checkSize( $_FILES[$this->fieldName]['size']);
 
-            if ( $this->allowedTypes) {
-                $this->checkType( $_FILES[$this->fieldName]['type'] );
+            $ext = pathinfo($_FILES[$this->fieldName]['name'], PATHINFO_EXTENSION);
+            if ( !empty($this->denyFiles)) {
+                $this->checkExtension( $ext );
+            }
+            if ( !empty($this->allowTypes)) {
+                $this->checkType( $ext, $_FILES[$this->fieldName]['type'] );
             }
 			return;
 		}
@@ -36,8 +42,12 @@ class Upload
 		$this->checkError( $_FILES[$this->fieldName]['error'][$idx]);
 		$this->checkSize( $_FILES[$this->fieldName]['size'][$idx]);
 
-		if ( $this->allowedTypes) {
-			$this->checkType( $_FILES[$this->fieldName]['type'][$idx] );
+        $ext = pathinfo($_FILES[$this->fieldName]['name'][$idx], PATHINFO_EXTENSION);
+        if ( !empty($this->denyFiles)) {
+            $this->checkExtension( $ext );
+        }
+		if ( !empty($this->allowTypes)) {
+			$this->checkType( $ext, $_FILES[$this->fieldName]['type'][$idx] );
 		}
 	}
     public function save()
@@ -55,7 +65,7 @@ class Upload
                 $file = new File();
                 $file->create($this->destDir);
             }
-            $newFileName = $this->newFileName( $_FILES[$this->fieldName]['name'] );
+            $newFileName = $this->newFileName( basename($_FILES[$this->fieldName]['name']) );
             $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
 
             if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'], $filePath)) {
@@ -78,7 +88,7 @@ class Upload
 
 				$this->checkAll($idx);
 
-                $newFileName = $this->newFileName( $_FILES[$this->fieldName]['name'][$idx] );
+                $newFileName = $this->newFileName( basename($_FILES[$this->fieldName]['name'][$idx]) );
                 $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
 
                 if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'][$idx], $filePath)) {
@@ -109,14 +119,25 @@ class Upload
             throw new Exception(sprintf(__('只能上傳大小不超過%s的檔案'), File::formatBytes($this->maxSize)));
         }
     }
-    public function checkType($type)
+    public function checkExtension( $ext )
     {
-        foreach ( $this->allowedTypes as $ext => $mimes ) {
+        if ( in_array($ext, $this->denyFiles) ) {
+            throw new Exception(__('不接受的檔案格式'));
+        }
+    }
+    public function checkType( $ext, $type)
+    {
+        $message = sprintf(__('請上傳 %s 格式的檔案'), implode(', ', array_keys($this->allowTypes)));
+
+        if ( ! isset($this->allowTypes[$ext])) {
+            throw new Exception($message);
+        }
+        foreach ( $this->allowTypes as $ext => $mimes ) {
             if ( in_array($type, $mimes)) {
                 return;
             }
         }
-        throw new Exception(sprintf(__('請上傳 %s 格式的檔案'), implode(', ', array_keys($this->allowedTypes))));
+        throw new Exception($message);
     }
     /**
      * 產生不重複的新檔名
@@ -126,22 +147,23 @@ class Upload
      */
     public function newFileName( $filename )
     {
-        $ext = pathinfo($filename, PATHINFO_EXTENSION);
-
         if ( false === $this->rename ) {
             return $filename;
         }
 
+        $ext = pathinfo($filename, PATHINFO_EXTENSION);
+        $ext = '' === $ext ? '' : '.' . $ext;
+
         if ( true === $this->rename ) {
             $name = date('YmdHis') . '.' . mt_rand(1000, 9999);
-            while ( file_exists($this->destDir . DIRECTORY_SEPARATOR . $name)) {
+            while ( file_exists($this->destDir . DIRECTORY_SEPARATOR . $name . $ext)) {
                 $name = date('YmdHis') . '-' . mt_rand(1000, 9999);
             }
-            return ( '' !== $ext ? $name.'.'.$ext : $name);
+            return $name . $ext;
         }
 
         if ( is_string($this->rename) && strlen($this->rename) > 0 ) {
-            return ( '' !== $ext ? $this->rename.'.'.$ext : $this->rename);
+            return $this->rename . $ext;
         }
     }
     public function checkError($errorno)

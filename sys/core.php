@@ -915,7 +915,10 @@ class Validator
             $uploader->maxSize = $opt['max_size'];
         }
         if ( isset($opt['allow_types'])) {
-            $uploader->allowedTypes = $opt['allow_types'];
+            $uploader->allowTypes = $opt['allow_types'];
+        }
+        if ( isset($opt['deny_files'])) {
+            $uploader->denyFiles = $opt['deny_files'];
         }
 
         try {
