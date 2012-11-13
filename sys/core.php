@@ -121,10 +121,10 @@ class App
         self::boot();
 
         if ( ! $page = $urls->segment(0)) {
-            $page = $urls->segments[0] = self::$defaultController;
+            $page = self::$defaultController;
         }
         if ( ! $action = $urls->segment(1)) {
-            $action = $urls->segments[1] = self::$defaultAction;
+            $action = self::$defaultAction;
         }
         if ( is_array($aclConfigFile)) {
             $acl = $aclConfigFile;
@@ -150,11 +150,11 @@ class App
                 throw new NotFoundException(_e('頁面不存在'));
             }
             if ( false === strpos($defaultRoute, '/')) {
-                $page = $urls->segments[0] = $defaultRoute;
+                $page = $defaultRoute;
             } else {
                 $defaultRoute = explode('/', $defaultRoute);
-                $page = $urls->segments[0] = $defaultRoute[0];
-                $action = $urls->segments[1] = $defaultRoute[1];
+                $page = $defaultRoute[0];
+                $action = $defaultRoute[1];
             }
         }
 
@@ -1170,12 +1170,6 @@ class Urls
      **/
     private $_modRewriteEnabled = null;
     /**
-     * route 的基本路徑(如用於語系切換)
-     *
-     * @var string
-     **/
-    public $routeBase = null;
-    /**
      * 路徑的網址參數名稱
      *
      * @var string
@@ -1186,8 +1180,15 @@ class Urls
      *
      * @var array
      **/
-    public $segments;
-    public $queryString;
+    private $_segments;
+    private $_queryString;
+    /**
+     * route 的基本路徑(如用於語系切換)
+     *
+     * @var string
+     **/
+    private $_queryStringPrefix = null;
+
 
     /**
      * 建構式
@@ -1202,8 +1203,12 @@ class Urls
         $this->_modRewriteEnabled = App::conf()->enable_rewrite && self::_isModRewriteEnabled();
         $this->_paramName = $paramName;
 
-        $this->queryString = isset($_GET[$this->_paramName]) ? trim($_GET[$this->_paramName], '/') : '';
-        $this->segments = explode('/', $this->queryString);
+        $this->_queryString = isset($_GET[$this->_paramName]) ? trim($_GET[$this->_paramName], '/') : '';
+        $this->_segments = explode('/', $this->_queryString);
+    }
+    public function setQueryStringPrefix($prefix)
+    {
+        $this->_queryStringPrefix = $prefix;
     }
     /**
      * 偵測伺服器是否有啟用 mod rewrite
@@ -1218,6 +1223,15 @@ class Urls
         return (getenv('HTTP_MOD_REWRITE') === 'On');
     }
     /**
+     * 傳回網址的路由參數值
+     *
+     * @return string
+     */
+    public function getQueryString()
+    {
+        return $this->_queryString;
+    }
+    /**
      * 傳回指定部位的網址路徑
      *
      * @param integer $index 網址路徑的部位，從0開始
@@ -1226,8 +1240,8 @@ class Urls
      **/
     public function segment($index, $default='')
     {
-        if ( isset($this->segments[$index]) && $this->segments[$index] !== '') {
-            return $this->segments[$index];
+        if ( isset($this->_segments[$index]) && $this->_segments[$index] !== '') {
+            return $this->_segments[$index];
         }
         return $default;
     }
@@ -1239,34 +1253,37 @@ class Urls
      * @param string $argSeparator 當 mod rewrite 未啟用時，連接 url 參數的字串(& or &amp;)
      * @return string
      **/
-    public function urlto( $routeuri, $fullurl = false, $argSeparator='&amp;', $addonParams = array())
+    public function urlto( $routeuri, $addonParams = null, $options = array( 'fullurl' => false, 'argSeparator' => '&amp;') )
     {
-        if ( is_array($fullurl)) {
-            $addonParams = $fullurl;
-            $fullurl = false;
-            $argSeparator = '&amp;';
-        } else if ( is_string($fullurl)) {
-            $argSeparator = $fullurl;
-            $fullurl = false;
-            $addonParams = array();
+        $fullurl = false;
+        $argSeparator = '&amp;';
+        extract($options, EXTR_IF_EXISTS);
+
+        if ( !is_array($addonParams) || empty($addonParams)) {
+            $addonParams = null;
         }
-        $routeuri = ($routeuri = trim($routeuri, '/')) ? ($this->routeBase ? $this->routeBase . '/' : '') . $routeuri : $this->routeBase;
+
+        if ( ! $routeuri = trim($routeuri, '/')) {
+            $uri = $this->_queryStringPrefix;
+        } else {
+            $uri = ($this->_queryStringPrefix ? $this->_queryStringPrefix . '/' : '') . $routeuri;
+        }
 
         if ( $this->_modRewriteEnabled ) {
-            $url = $this->_urlBase . $routeuri;
+            $url = $this->_urlBase . $uri;
             if ( !empty($addonParams)) {
                 $url .= '?' . http_build_query($addonParams, '', $argSeparator);
             }
 
         } else {
-            $params = array( $this->_paramName => $routeuri );
+            $params = array( $this->_paramName => $uri );
             if ( !empty($addonParams)) {
                 $params = array_merge($addonParams, $params);
             }
-            $routeuri = http_build_query($params, '', $argSeparator);
-            if ( $routeuri ) {
-                $routeuri = str_replace('%2F', '/', $routeuri);
-                $url = $this->_urlBase . '?' . $routeuri;
+            $uri = http_build_query($params, '', $argSeparator);
+            if ( $uri ) {
+                $uri = str_replace('%2F', '/', $uri);
+                $url = $this->_urlBase . '?' . $uri;
             } else {
                 $url = $this->_urlBase;
             }
@@ -1291,8 +1308,8 @@ class Urls
     }
     public function exceptionResponse($statusCode, $message)
     {
-        header("HTTP/1.0 {$statusCode} {$message}");
-        echo "{$statusCode} {$message}";
+        header('HTTP/1.0 ' . $statusCode . ' ' . $message);
+        echo $statusCode, ' ', $message;
         exit;
     }
 
