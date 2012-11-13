@@ -1,0 +1,41 @@
+<?php
+error_reporting(E_ALL|E_STRICT);
+
+$config = array(
+    'timezone' => 'Asia/Taipei',
+    'encoding' => 'UTF-8',
+    'language' => 'zh',
+    'language_code' => 'zh-tw',
+    'locale' => 'zh_TW.UTF-8',
+    'enable_rewrite' => false,
+    'cache_dir' => 'cache',
+    'system_email' => 'noreply@localhost', // 系統的發信地址
+    'site_name' => 'Site Name',
+
+    // 設定資料庫
+    'db' => array(
+        'host' => 'localhost',
+        'name' => 'test',
+        'charset' => 'utf8',
+        'user' => 'dev',
+        'password' => 'dev'
+    ),
+
+    // 分頁設定
+    'pagination' => array(
+        'rows_per_page'     => 20,      // 每頁顯示20筆資料
+        'num_per_page'      => 10,      // 每次顯示10個頁碼
+    ),
+);
+
+define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+define('SYS_PATH', ROOT_PATH . 'sys' . DIRECTORY_SEPARATOR);
+
+if ( ! defined('ROOT_URL')) {
+    define('ROOT_URL', rtrim(dirname($_SERVER['PHP_SELF']), '/.\\') . '/');
+}
+if ( ! defined('ASSETS_URL')) {
+    define('ASSETS_URL', ROOT_URL . 'assets/');
+    define('ASSETS_PATH', ROOT_PATH . 'assets' . DIRECTORY_SEPARATOR);
+}
+define('TRIM_MARKER', '&#8230;');

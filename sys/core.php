@@ -4,10 +4,6 @@ class NotFoundException extends Exception {}
 class App
 {
     public static $id = 'frontend';
-    public static $defaultController = 'home';
-    public static $defaultAction = 'index';
-    public static $userRole = 'anonymous';
-
     private static $_urlsList = array();
 
     private static function _array2Obj($array)
@@ -22,7 +18,23 @@ class App
         }
         return (object) $array;
     }
-    public static function boot()
+    /**
+     * 啟動應用程式
+     *
+     * @param array $routeConfig
+     * @param array $aclConfig
+     * @param string $aclRole
+     * @return void
+     */
+    public static function run($routeConfig=NULL, $aclConfig=NULL, $aclRole='anonymous')
+    {
+        self::prepare();
+        self::route($routeConfig)->parse();
+        self::acl($aclConfig)->check($aclRole);
+        self::doAction();
+    }
+
+    public static function prepare()
     {
         $conf = App::conf();
 
@@ -55,6 +67,62 @@ class App
         $_REQUEST['is_ajax'] = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
         $_REQUEST['is_ssl'] = is_ssl();
     }
+    public static function doAction()
+    {
+        // load file
+        if ( '_' === $_REQUEST['action']{0} ) {
+            throw new NotFoundException(_e('頁面不存在'));
+        }
+        $class = camelize($_REQUEST['controller']);
+        $action = camelize($_REQUEST['action'], false);
+
+        $file = ROOT_PATH . self::$id . '/controllers/' . $class . '.php';
+        if ( ! file_exists($file)) {
+            throw new NotFoundException(_e('頁面不存在'));
+        }
+        require $file;
+
+        $class .= 'Controller';
+        $controller = new $class();
+
+        if ( ! is_callable(array($controller, $action))) {
+            if ( ! $controller->defaultAction ) {
+                throw new NotFoundException(_e('頁面不存在'));
+            }
+            $action = $controller->defaultAction;
+        }
+
+        if ( method_exists($controller, 'preAction')) {
+            $controller->preAction();
+        }
+
+        $controller->{$action}();
+
+        if ( method_exists($controller, 'postAction')) {
+            $controller->postAction();
+        }
+    }
+
+
+    public static function route($routeConfig=NULL)
+    {
+        static $route;
+
+        if ( NULL === $route ) {
+            $route = new Route($routeConfig);
+            $route->appendDefaultRoute();
+        }
+        return $route;
+    }
+    public static function acl($aclConfig=NULL)
+    {
+        static $acl;
+
+        if ( NULL === $acl ) {
+            $acl = new Acl($aclConfig);
+        }
+        return $acl;
+    }
     public static function conf()
     {
         static $conf = NULL;
@@ -81,10 +149,6 @@ class App
         }
         return $db;
     }
-    public static function view($appId=NULL)
-    {
-        return new View($appId ? $appId : self::$id);
-    }
     public static function urls($id='primary', $urlBase=NULL, $paramName='q')
     {
         if ( isset(self::$_urlsList[$id])) {
@@ -93,6 +157,13 @@ class App
         $urlBase = rtrim($urlBase, '/') . '/';
         return (self::$_urlsList[$id] = new Urls( $urlBase, $paramName ));
     }
+
+
+    public static function view($appId=NULL)
+    {
+        return new View($appId ? $appId : self::$id);
+    }
+
     public static function loadHelper($class, $createObj=false, $appId=NULL)
     {
         require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/helpers/' . $class . '.php';
@@ -106,102 +177,6 @@ class App
 
         if ( $createObj ) {
             return new $model;
-        }
-    }
-    /**
-     * 路由轉換
-     *
-     * @param mixed 可以是 $acl 陣列檔案路徑，或陣列，如: array( 'anonymous' => '*')
-     * @return void
-     */
-    public static function route($aclConfigFile)
-    {
-        $urls = App::urls();
-
-        self::boot();
-
-        if ( ! $page = $urls->segment(0)) {
-            $page = self::$defaultController;
-        }
-        if ( ! $action = $urls->segment(1)) {
-            $action = self::$defaultAction;
-        }
-        if ( is_array($aclConfigFile)) {
-            $acl = $aclConfigFile;
-            unset($aclConfigFile);
-        } else {
-            require $aclConfigFile;
-        }
-        if ( false === strpos($action, '.')) {
-            $_REQUEST['format'] = 'html';
-        } else {
-            $info = pathinfo($action);
-            $_REQUEST['format'] = $info['extension'];
-            $action = $info['filename'];
-        }
-        if (
-            '*' !== $acl[App::$userRole] &&
-            ! isset($acl[App::$userRole][$page]) &&
-            ! isset($acl[App::$userRole][$page.'/'.$action])
-        ) {
-            $defaultRoute = $acl[App::$userRole]['__defaultRoute'];
-            if ( $defaultRoute === '404') {
-                $_REQUEST['controller'] = null;
-                throw new NotFoundException(_e('頁面不存在'));
-            }
-            if ( false === strpos($defaultRoute, '/')) {
-                $page = $defaultRoute;
-            } else {
-                $defaultRoute = explode('/', $defaultRoute);
-                $page = $defaultRoute[0];
-                $action = $defaultRoute[1];
-            }
-        }
-
-        $_REQUEST['controller'] = $page;
-        $_REQUEST['action'] = $action;
-        if (  '*' !== $acl[App::$userRole] ) {
-            if ( isset($acl[App::$userRole][$page.'/'.$action])) {
-                $page_name = $acl[App::$userRole][$page.'/'.$action];
-            } else {
-                $page_name = $acl[App::$userRole][$page];
-            }
-        } else {
-            $page_name = null;
-        }
-
-        if ( '_' === $action{0} ) {
-            throw new NotFoundException(_e('頁面不存在'));
-        }
-        $class = camelize($page);
-        $action = camelize($action, false);
-
-        $controller_path = ROOT_PATH . self::$id . '/controllers/' . $class . '.php';
-
-        if ( ! file_exists($controller_path)) {
-            throw new NotFoundException(_e('頁面不存在'));
-        }
-        require $controller_path;
-
-        $class .= 'Controller';
-        $controller = new $class();
-        $controller->_setTitle($page_name);
-
-        if ( ! is_callable(array($controller, $action))) {
-            if ( ! $controller->defaultAction ) {
-                throw new NotFoundException(_e('頁面不存在'));
-            }
-            $_REQUEST['action'] = $action = $controller->defaultAction;
-        }
-
-        if ( method_exists($controller, 'preAction')) {
-            $controller->preAction();
-        }
-
-        $controller->{$action}();
-
-        if ( method_exists($controller, 'postAction')) {
-            $controller->postAction();
         }
     }
 } // END class
@@ -1187,7 +1162,7 @@ class Urls
      *
      * @var string
      **/
-    private $_queryStringPrefix = null;
+    private $_queryStringPrefix;
 
 
     /**
@@ -1311,6 +1286,191 @@ class Urls
         header('HTTP/1.0 ' . $statusCode . ' ' . $message);
         echo $statusCode, ' ', $message;
         exit;
+    }
+
+} // END class
+class Route
+{
+    private $_routes = array();
+    private $_namedRoutes = array();
+    private $_defaultParams = array();
+
+    public function __construct($routeConfig)
+    {
+        if ( NULL === $routeConfig) {
+            if ( file_exists(ROOT_PATH . 'config.route.php')) {
+                $routeConfig = require_once(ROOT_PATH . 'config.route.php');
+            } else {
+                throw new Exception('$routeConfig is required');
+            }
+        }
+
+        $this->setRoutes($routeConfig);
+    }
+    public function setRoutes($routeConfig)
+    {
+        if ( isset($routeConfig['__defaultParams'])) {
+            $this->_defaultParams = $routeConfig['__defaultParams'];
+            $_REQUEST = array_merge($_REQUEST, $routeConfig['__defaultParams']);
+            unset($routeConfig['__defaultParams']);
+        }
+
+        $this->_routes = $routeConfig;
+        $this->_namedRoutes = self::_filterNamedRoutes($this->_routes);
+    }
+    public function appendDefaultRoute()
+    {
+        // default route: {{controller}}/{{action}}/{{id}}.{{format}}
+        $pattern = '(?P<controller>[^./])?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(.(?<format>[^/]+))?';
+        $config = array('__id' => 'default');
+
+        $this->_routes[$pattern] = $config;
+
+        // update named routes
+        $named = self::_filterNamedRoutes(array( $pattern => $config ));
+        $this->_namedRoutes['default'] = $named['default'];
+    }
+    private static function _filterNamedRoutes($routes)
+    {
+        $namedRoutes = array();
+        foreach ($routes as $pattern => $config) {
+            if ( isset($config['__id']) && ($id = $config['__id']) && !isset($namedRoutes[$id])) {
+                unset($config['__id']);
+                $config['pattern'] = $pattern;
+                $namedRoutes[$id] = $config;
+            }
+        }
+        return $namedRoutes;
+    }
+    public function getNamedRoutes()
+    {
+        return $this->_namedRoutes;
+    }
+    public function getDefault($key)
+    {
+        return isset($this->_defaultParams[$key]) ? $this->_defaultParams[$key] : null;
+    }
+    public function parse()
+    {
+        $queryString = App::urls()->getQueryString();
+        foreach ($this->_routes as $pattern => $config) {
+            if ( !preg_match('#^' . $pattern . '#', $queryString, $matches)) {
+                continue;
+            }
+
+            // pass route parameters to $_REQUEST array
+            unset($config['__id']);
+            $_REQUEST = array_merge($_REQUEST, $config);
+            foreach ( $matches as $name => $value) {
+                if ( is_string($name)) {
+                    $_REQUEST[$name] = ('' === $value && isset($this->_defaultParams[$name])) ? $this->_defaultParams[$name] : $value;
+                }
+            }
+            break;
+        }
+    }
+
+} // END class
+
+class Acl
+{
+    private $_rules = array();
+    private $_role;
+
+    public function __construct($aclConfig)
+    {
+        if ( NULL === $aclConfig) {
+            if ( file_exists(ROOT_PATH . 'config.acl.php')) {
+                $aclConfig = require_once(ROOT_PATH . 'config.acl.php');
+            } else {
+                throw new Exception('$aclConfig is required');
+            }
+        }
+        $this->_rules = $aclConfig;
+    }
+
+    private function _getRoleRules($role)
+    {
+        $defaultRule = !isset($this->_rules['__default']) ? array() : $this->_rules['__default'];
+        $rule = $this->_rules[$role];
+
+        foreach ($rule as $key => $value) {
+            if ( isset($defaultRule[$key])) {
+                unset($defaultRule[$key]);
+            }
+        }
+        return array_merge($defaultRule, $rule);
+    }
+
+    public function check($role='anonymous')
+    {
+        $this->_role = $role;
+        $rule = $this->_getRoleRules($role);
+
+        if ( ! $this->_isAccessible($rule)) {
+            if ( '404' === $rule['__failRoute']) {
+                throw new NotFoundException(_e('頁面不存在'));
+            }
+
+            if ( false === strpos($rule['__failRoute'], '/')) {
+                $_REQUEST['controller'] = $rule['__failRoute'];
+                $_REQUEST['action'] = App::route()->getDefault('action');
+            } else {
+                $route = explode('/', $rule['__failRoute']);
+                $_REQUEST['controller'] = $route[0];
+                $_REQUEST['action'] = $route[1];
+            }
+        }
+    }
+    private function _isAccessible($rule)
+    {
+        $keys = array_keys($rule);
+        $allowPrior = array_search('allow', $keys);
+        $denyPrior = array_search('deny', $keys);
+        unset($keys);
+
+        $path = $_REQUEST['controller'] . '/' . $_REQUEST['action'];
+        if ( $denyPrior > $allowPrior ) {
+            return ( !$this->_inList($path, $rule['deny']) && $this->_inList($path, $rule['allow']) );
+        }
+        return ( $this->_inList($path, $rule['allow']) || !$this->_inList($path, $rule['deny']));
+    }
+    private function _inList($path, $rule)
+    {
+        if ( is_string($rule)) {
+            return $this->_matchRule($path, $rule);
+        }
+
+        if ( is_array($rule)) {
+            foreach ($rule as $r) {
+                if ( $this->_matchRule($path, $r)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private function _matchRule($path, $rule)
+    {
+        if ('*' === $rule) {
+            return true;
+        }
+        if ( false === strpos($rule, '/')) {
+            return ($path === $rule);
+        }
+
+        list($rController, $rAction) = explode('/', $rule);
+        if ( '*' !== $rAction) {
+            return ($path === $rule);
+        }
+
+        list($controller) = explode('/', $path);
+        return ($controller === $rController);
+    }
+
+    public function getRole()
+    {
+        return $this->_role;
     }
 
 } // END class
