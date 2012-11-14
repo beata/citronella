@@ -2,7 +2,7 @@
 require_once 'PHPUnit/Framework/TestCase.php';
 require_once __DIR__ . '/../../sys/functions.php';
 require_once __DIR__ . '/../../sys/core.php';
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 
 class CoreAppTest extends PHPUnit_Framework_TestCase
 {

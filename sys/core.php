@@ -1298,11 +1298,16 @@ class Route
     public function __construct($routeConfig)
     {
         if ( NULL === $routeConfig) {
-            if ( file_exists(ROOT_PATH . 'config.route.php')) {
-                $routeConfig = require_once(ROOT_PATH . 'config.route.php');
-            } else {
+            $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'route.' . App::$id . '.php';
+        } elseif (is_string($routeConfig)) {
+            $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'route.' . $routeConfig . '.php';
+        }
+
+        if ( isset($file)) {
+            if ( ! file_exists($file)) {
                 throw new Exception('$routeConfig is required');
             }
+            $routeConfig = require_once($file);
         }
 
         $this->setRoutes($routeConfig);
@@ -1380,12 +1385,18 @@ class Acl
     public function __construct($aclConfig)
     {
         if ( NULL === $aclConfig) {
-            if ( file_exists(ROOT_PATH . 'config.acl.php')) {
-                $aclConfig = require_once(ROOT_PATH . 'config.acl.php');
-            } else {
+            $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'acl.' . App::$id . '.php';
+        } elseif ( is_string($aclConfig)) {
+            $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'acl.' . $aclConfig . '.php';
+        }
+
+        if ( isset($file)) {
+            if ( ! file_exists($file)) {
                 throw new Exception('$aclConfig is required');
             }
+            $aclConfig = require_once($file);
         }
+
         $this->_rules = $aclConfig;
     }
 
