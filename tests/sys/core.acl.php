@@ -104,7 +104,8 @@ class CoreAclTest extends PHPUnit_Framework_TestCase
         $_REQUEST['action'] = 'login';
         $this->assertFalse($this->_isAccessible->invokeArgs($this->_acl, array($rule)));
 
-        $this->_acl->check('writer');
+        $this->_acl->setRole('writer');
+        $this->_acl->check();
         $this->assertEquals('forbid-access', $_REQUEST['controller']);
         $this->assertEquals('index', $_REQUEST['action']);
     }
@@ -129,7 +130,8 @@ class CoreAclTest extends PHPUnit_Framework_TestCase
         $_REQUEST['controller'] = 'aa';
         $_REQUEST['action'] = 'bb';
         $this->assertFalse($this->_isAccessible->invokeArgs($this->_acl, array($rule)));
-        $this->_acl->check('anonymous');
+        $this->_acl->setRole('anonymous');
+        $this->_acl->check();
         $this->assertEquals('auth', $_REQUEST['controller']);
         $this->assertEquals('login', $_REQUEST['action']);
 

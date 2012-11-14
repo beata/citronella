@@ -30,8 +30,8 @@ class App
     {
         self::prepare();
         self::route($routeConfig)->parse();
-        self::acl($aclConfig)->check($aclRole);
-        self::doAction();
+        self::acl($aclConfig, $aclRole)->check();
+        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
     }
 
     public static function prepare()
@@ -67,14 +67,14 @@ class App
         $_REQUEST['is_ajax'] = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
         $_REQUEST['is_ssl'] = is_ssl();
     }
-    public static function doAction()
+    public static function doAction($controllerName, $actionName)
     {
         // load file
-        if ( '_' === $_REQUEST['action']{0} ) {
+        if ( '_' === $actionName{0} ) {
             throw new NotFoundException(_e('頁面不存在'));
         }
-        $class = camelize($_REQUEST['controller']);
-        $action = camelize($_REQUEST['action'], false);
+        $class = camelize($controllerName);
+        $action = camelize($actionName, false);
 
         $file = ROOT_PATH . self::$id . '/controllers/' . $class . '.php';
         if ( ! file_exists($file)) {
@@ -114,12 +114,12 @@ class App
         }
         return $route;
     }
-    public static function acl($aclConfig=NULL)
+    public static function acl($aclConfig=NULL, $aclRole=NULL)
     {
         static $acl;
 
         if ( NULL === $acl ) {
-            $acl = new Acl($aclConfig);
+            $acl = new Acl($aclConfig, $aclRole);
         }
         return $acl;
     }
@@ -1294,6 +1294,7 @@ class Route
     private $_routes = array();
     private $_namedRoutes = array();
     private $_defaultParams = array();
+    private $_history = array();
 
     public function __construct($routeConfig)
     {
@@ -1375,14 +1376,23 @@ class Route
         }
     }
 
+    public function forwardTo($controller, $action)
+    {
+        $this->_history[] = array(
+            'controller' => $_REQUEST['controller'],
+            'action' => $_REQUEST['action']
+        );
+        self::acl()->check();
+        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
+    }
 } // END class
 
 class Acl
 {
     private $_rules = array();
-    private $_role;
+    private $_role = 'anonymous';
 
-    public function __construct($aclConfig)
+    public function __construct($aclConfig, $aclRole=NULL)
     {
         if ( NULL === $aclConfig) {
             $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'acl.' . App::$id . '.php';
@@ -1398,6 +1408,7 @@ class Acl
         }
 
         $this->_rules = $aclConfig;
+        $this->_role = $aclRole;
     }
 
     private function _getRoleRules($role)
@@ -1413,10 +1424,9 @@ class Acl
         return array_merge($defaultRule, $rule);
     }
 
-    public function check($role='anonymous')
+    public function check()
     {
-        $this->_role = $role;
-        $rule = $this->_getRoleRules($role);
+        $rule = $this->_getRoleRules($this->_role);
 
         if ( ! $this->_isAccessible($rule)) {
             if ( '404' === $rule['__failRoute']) {
@@ -1482,6 +1492,10 @@ class Acl
     public function getRole()
     {
         return $this->_role;
+    }
+    public function setRole($role)
+    {
+        $this->_role = $role;
     }
 
 } // END class
