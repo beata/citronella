@@ -27,6 +27,11 @@ class CoreRouteTest extends PHPUnit_Framework_TestCase
                 'action' => 'profile',
                 '__id' => 'user_profile',
             ),
+            'activity/(?P<action>a|b|c)' => array(
+                'controller' => 'activity',
+                'action' => 'd',
+                '__id' => 'activity_action',
+            ),
             'home' => array(
                 'controller' => 'news',
                 'action' => 'latest',
@@ -135,5 +140,12 @@ class CoreRouteTest extends PHPUnit_Framework_TestCase
         $this->assertEquals('home', $_REQUEST['controller']);
         $this->assertEquals('index', $_REQUEST['action']);
         $this->assertEquals('html', $_REQUEST['format']);
+    }
+    public function testParseActivityAction()
+    {
+        $_GET['q'] = 'activity/b/';
+        $this->_parse();
+        $this->assertEquals('activity', $_REQUEST['controller']);
+        $this->assertEquals('d', $_REQUEST['action']);
     }
 }

@@ -1220,45 +1220,79 @@ class Urls
         }
         return $default;
     }
+    public function urltoId($routeId, $routeParams=null, $urlParams=null, $options=array( 'fullurl' => false, 'argSeparator' => '&amp;'))
+    {
+        $route = App::route();
+
+        if ( !$rule = $route->getNamedRoutes($routeId)) {
+            return null;
+        }
+
+        $parsePattern = '#(\(\?P<(?P<name>[^>]+)>(?P<pattern>[^)]+)\)(?P<optional>[?])?)#';
+        $url = preg_replace_callback($parsePattern, function($matches) use($route, $routeParams){
+            $paramName = $matches['name'];
+            if (isset($routeParams[$paramName])) {
+                return $routeParams[$paramName];
+            }
+            return $route->getDefault($paramName);
+        }, $rule['pattern']);
+
+
+        if ('default' !== $routeId) {
+            $url = str_replace(array('(/)?', '(', ')?'), '', $url);
+            return $this->urlto($url, $urlParams, $options);
+        }
+
+        $strips = array('(/)?');
+        if ( !isset($routeParams['action'])) {
+            $strips[] = '(/' . $route->getDefault('action') . ')?';
+        }
+        if ( !isset($routeParams['format'])) {
+            $strips[] = '(.' . $route->getDefault('format') . ')?';
+        }
+        array_push($strips, '(', ')?');
+        $url = str_replace($strips, '', $url);
+        if ( !isset($routeParams['controller']) && $url === $route->getDefault('controller')) {
+            $url = '';
+        }
+        return $this->urlto($url, $urlParams, $options);
+    }
     /**
      * 傳回網址
      *
-     * @param string $routeuri ex. /blog/edit
-     * @param boolean $fullurl
-     * @param string $argSeparator 當 mod rewrite 未啟用時，連接 url 參數的字串(& or &amp;)
      * @return string
      **/
-    public function urlto( $routeuri, $addonParams = null, $options = array( 'fullurl' => false, 'argSeparator' => '&amp;') )
+    public function urlto( $url, $urlParams = null, $options=array( 'fullurl' => false, 'argSeparator' => '&amp;') )
     {
         $fullurl = false;
         $argSeparator = '&amp;';
         extract($options, EXTR_IF_EXISTS);
 
-        if ( !is_array($addonParams) || empty($addonParams)) {
-            $addonParams = null;
+        if ( !is_array($urlParams) || empty($urlParams)) {
+            $urlParams = null;
         }
 
-        if ( ! $routeuri = trim($routeuri, '/')) {
-            $uri = $this->_queryStringPrefix;
+        if ( ! $url = trim($url, '/')) {
+            $url = $this->_queryStringPrefix;
         } else {
-            $uri = ($this->_queryStringPrefix ? $this->_queryStringPrefix . '/' : '') . $routeuri;
+            $url = ($this->_queryStringPrefix ? $this->_queryStringPrefix . '/' : '') . $url;
         }
 
         if ( $this->_modRewriteEnabled ) {
-            $url = $this->_urlBase . $uri;
-            if ( !empty($addonParams)) {
-                $url .= '?' . http_build_query($addonParams, '', $argSeparator);
+            $url = $this->_urlBase . $url;
+            if ( !empty($urlParams)) {
+                $url .= '?' . http_build_query($urlParams, '', $argSeparator);
             }
 
         } else {
-            $params = array( $this->_paramName => $uri );
-            if ( !empty($addonParams)) {
-                $params = array_merge($addonParams, $params);
+            $params = array( $this->_paramName => $url );
+            if ( !empty($urlParams)) {
+                $params = array_merge($urlParams, $params);
             }
-            $uri = http_build_query($params, '', $argSeparator);
-            if ( $uri ) {
-                $uri = str_replace('%2F', '/', $uri);
-                $url = $this->_urlBase . '?' . $uri;
+            $url = http_build_query($params, '', $argSeparator);
+            if ( $url ) {
+                $url = str_replace('%2F', '/', $url);
+                $url = $this->_urlBase . '?' . $url;
             } else {
                 $url = $this->_urlBase;
             }
@@ -1327,7 +1361,7 @@ class Route
     public function appendDefaultRoute()
     {
         // default route: {{controller}}/{{action}}/{{id}}.{{format}}
-        $pattern = '(?P<controller>[^./])?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(.(?<format>[^/]+))?';
+        $pattern = '(?P<controller>[^./])?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(.(?P<format>[^/]+))?';
         $config = array('__id' => 'default');
 
         $this->_routes[$pattern] = $config;
@@ -1348,9 +1382,12 @@ class Route
         }
         return $namedRoutes;
     }
-    public function getNamedRoutes()
+    public function getNamedRoutes($key=NULL)
     {
-        return $this->_namedRoutes;
+        if ( NULL === $key) {
+            return $this->_namedRoutes;
+        }
+        return !isset($this->_namedRoutes[$key]) ? NULL : $this->_namedRoutes[$key];
     }
     public function getDefault($key)
     {
@@ -1369,7 +1406,13 @@ class Route
             $_REQUEST = array_merge($_REQUEST, $config);
             foreach ( $matches as $name => $value) {
                 if ( is_string($name)) {
-                    $_REQUEST[$name] = ('' === $value && isset($this->_defaultParams[$name])) ? $this->_defaultParams[$name] : $value;
+                    if ('' === $value && isset($this->_defaultParams[$name])) {
+                        $_REQUEST[$name] = $this->_defaultParams[$name];
+                    } elseif (isset($config[$name])) {
+                        $_REQUEST[$name] = $config[$name];
+                    } else {
+                        $_REQUEST[$name] = $value;
+                    }
                 }
             }
             break;
