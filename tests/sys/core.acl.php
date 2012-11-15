@@ -14,6 +14,11 @@ class CoreAclTest extends PHPUnit_Framework_TestCase
                 'deny' => '*',
                 '__failRoute' => '404',
             ),
+            'allow_all' => array(
+                'deny' => array(),
+                'allow' => '*',
+                '__failRoute' => '404',
+            ),
             'admin' => array(
                 'allow' => '*',
                 'deny' => array( // 越後面的設定會蓋掉前面的設定
@@ -140,6 +145,24 @@ class CoreAclTest extends PHPUnit_Framework_TestCase
         $_REQUEST['action'] = 'login';
         $this->assertTrue($this->_isAccessible->invokeArgs($this->_acl, array($rule)));
 
+    }
+
+    public function testAllowAll()
+    {
+        $rule = $this->_getRoleRules->invokeArgs($this->_acl, array('allow_all'));
+        $this->assertEquals(array(
+            'allow' => '*',
+            'deny' => array(),
+            '__failRoute' => '404'
+        ), $rule);
+
+        $_REQUEST['controller'] = 'articles';
+        $_REQUEST['action'] = 'aa';
+        $this->assertTrue($this->_isAccessible->invokeArgs($this->_acl, array($rule)));
+
+        $_REQUEST['controller'] = 'aa';
+        $_REQUEST['action'] = 'bb';
+        $this->assertTrue($this->_isAccessible->invokeArgs($this->_acl, array($rule)));
     }
 
 }

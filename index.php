@@ -32,20 +32,25 @@ function user_menu()
 session_start();
 
 App::$id = 'frontend';
-App::$defaultController = 'home';
-App::$defaultAction = 'index';
-App::$userRole = 'anonymous';
 
 // init urls
 App::urls( 'primary', ROOT_URL, 'q');
 
-$acl = array( 'anonymous' => user_menu() );
-$acl['anonymous']['home'] = '';
-$acl['anonymous']['__defaultRoute'] = '404';
-
 // route
 try {
-    App::route( $acl );
+    App::run(array(
+        '__defaultParams' => array(
+            'controller' => 'home',
+            'action' => 'index',
+            'format' => 'html',
+        )
+    ), array(
+        'anonymous' => array(
+            'allow' => '*',
+            'deny' => array(),
+            '__failRoute' => '404',
+        )
+    ), 'anonymous');
 } catch ( NotFoundException $ex ) {
     $controller = new FrontBaseController();
     $controller->_show404(true);
