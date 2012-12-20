@@ -179,19 +179,28 @@ class App
             return new $model;
         }
     }
+    public static function loadViewModel($viewModelName, $createObj=false, $baseUrl=NULL, $appId=NULL)
+    {
+        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/viewModels/' . $viewModelName . '.php';
+        if ( $createObj ) {
+            $vm = $viewModelName . 'ViewModel';
+            return new $vm($createObj, $baseUrl);
+        }
+    }
 } // END class
 abstract class Controller
 {
     public $defaultAction;
     public $data = array();
 
-    private $_baseUrl;
+    protected $_baseUrl;
 
     public function _prepareLayout($type=NULL)
     {
         $this->data = array_merge($this->data, array(
             'conf' => App::conf(),
-            'urls' => App::urls()
+            'urls' => App::urls(),
+            'baseUrl' => $this->_baseUrl
         ));
     }
     public function _show404($backLink=false, $layout='layout')
@@ -246,7 +255,7 @@ abstract class BaseController extends Controller
                 ! ($method = '_api' . camelize($method, true)) ||
                 ! is_callable(array($obj, $method))
             ) {
-                throw new Exception(_e('未定義的呼叫接口'));
+                throw new Exception(_e('未定義的方法'));
             }
             $response = $obj->{$method}();
         } catch ( Exception $ex ) {
@@ -291,13 +300,15 @@ abstract class Module
 }
 abstract class Model
 {
-    protected static $_primaryKey;
-    protected static $_table;
+    protected $_config = array(
+        'primaryKey' => 'id',
+        'table' => null
+    );
 
     /*
     public function beforeVerify(&$field, &$input=NULL, $args) {}
     public function beforeSave(&$fields, $args) {}
-    public function afterSave(&$fields, $args) {}
+    public function afterSave(&$fields, &$input, $args) {}
     */
 
     public function verify(&$fields, &$input=NULL, $args=NULL)
@@ -309,6 +320,10 @@ abstract class Model
     }
     public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
     {
+        if ( NULL === $input) {
+            $input = &$_POST;
+        }
+
         if ( $verify ) {
             $this->verify($fields, $input, $args);
         }
@@ -330,10 +345,9 @@ abstract class Model
     public function insert($fields)
     {
         $db = App::db();
-        $model = get_class($this);
 
-        if ( is_array($model::$_primaryKey)) {
-            foreach ( $model::$_primaryKey as $key) {
+        if ( is_array($this->_config['primaryKey'])) {
+            foreach ( $this->_config['primaryKey'] as $key) {
                 if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
                     $fields[$key] = true;
                 }
@@ -346,64 +360,60 @@ abstract class Model
         } else {
             $sql = DBHelper::toKeyInsertSql($this, $fields, $params);
         }
-        $stmt = $db->prepare('INSERT INTO `' . $model::$_table . '` ' . $sql);
+        $stmt = $db->prepare('INSERT INTO `' . $this->_config['table'] . '` ' . $sql);
 
         DBHelper::bindArrayValue($stmt, $params);
         $stmt->execute();
 
-        if ( ! is_array($model::$_primaryKey)) {
-            $this->{$model::$_primaryKey} = $db->lastInsertId();
+        if ( ! is_array($this->_config['primaryKey'])) {
+            $this->{$this->_config['primaryKey']} = $db->lastInsertId();
             return;
         }
-        if ( in_array('id', $model::$_primaryKey) && ! $this->id) {
+        if ( in_array('id', $this->_config['primaryKey']) && ! $this->id) {
             $this->id = $db->lastInsertId();
         }
     }
     public function update($fields)
     {
-        $model = get_class($this);
-
         $params = array();
         if ( isset($this->rawValueFields)) {
             $sql = DBHelper::toKeySetSql($this, $fields, $params, $this->rawValueFields);
         } else {
             $sql = DBHelper::toKeySetSql($this, $fields, $params);
         }
-        if ( ! is_array($model::$_primaryKey)) {
-            $where = array( $model::$_primaryKey => $this->{$model::$_primaryKey} );
+        if ( ! is_array($this->_config['primaryKey'])) {
+            $where = array( $this->_config['primaryKey'] => $this->{$this->_config['primaryKey']} );
         } else {
             $where = array();
-            foreach ( $model::$_primaryKey as $key) {
+            foreach ( $this->_config['primaryKey'] as $key) {
                 $where[$key] = $this->{$key};
             }
         }
-        $stmt = App::db()->prepare('UPDATE `' . $model::$_table . '` SET ' . $sql . ' WHERE ' . DBHelper::where($where));
+        $stmt = App::db()->prepare('UPDATE `' . $this->_config['table'] . '` SET ' . $sql . ' WHERE ' . DBHelper::where($where));
 
         DBHelper::bindArrayValue($stmt, $params);
         $stmt->execute();
     }
     public function delete()
     {
-        $model = get_class($this);
-
-        if ( ! is_array($model::$_primaryKey)) {
-            $where = array( $model::$_primaryKey => $this->{$model::$_primaryKey} );
+        if ( ! is_array($this->_config['primaryKey'])) {
+            $where = array( $this->_config['primaryKey'] => $this->{$this->_config['primaryKey']} );
         } else {
             $where = array();
-            foreach ( $model::$_primaryKey as $key) {
+            foreach ( $this->_config['primaryKey'] as $key) {
                 $where[$key] = $this->{$key};
             }
         }
 
-        App::db()->exec('DELETE FROM `' . $model::$_table . '` WHERE ' . DBHelper::where($where) );
+        App::db()->exec('DELETE FROM `' . $this->_config['table'] . '` WHERE ' . DBHelper::where($where) );
     }
+
     public function hasPrimaryKey()
     {
-        $model = get_class($this);
-        if ( ! is_array($model::$_primaryKey)) {
-            return !empty($this->{$model::$_primaryKey});
+        if ( ! is_array($this->_config['primaryKey'])) {
+            return !empty($this->{$this->_config['primaryKey']});
         }
-        foreach ($model::$_primaryKey as $key ) {
+        foreach ($this->_config['primaryKey'] as $key ) {
             if ( $this->{$key} === NULL ) {
                 return false;
             }
@@ -411,79 +421,38 @@ abstract class Model
         return true;
     }
 
-    public static function deleteAll($ids)
+
+
+    // Model Config
+    public function getConfig($key=null)
     {
-        $model = get_called_class();
-        App::db()->exec('DELETE FROM `' . $model::$_table . '` WHERE `' . $model::$_primaryKey . '` ' . DBHelper::in($ids));
-    }
-    public static function updateAll($data, $ids)
-    {
-        $model = get_called_class();
-
-        $params = array();
-
-        $fields = array_keys($data);
-        $data = (object)$data;
-        $sql = DBHelper::toKeySetSql($data, $fields, $params);
-        $stmt = App::db()->prepare('UPDATE `' . $model::$_table . '` SET ' . $sql . ' WHERE `' . $model::$_primaryKey . '` ' . DBHelper::in($ids));
-        $stmt->execute($params);
-    }
-
-    public static function count(Search $search)
-    {
-        $model = get_called_class();
-
-        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $model::$_table . '` a ' . $search->sqlWhere() . ' LIMIT 1');
-        $stmt->execute($search->params);
-        return $stmt->fetchColumn();
-    }
-
-    public static function getList(Search $search, Pagination $pager)
-    {
-        $model = get_called_class();
-
-        $stmt = App::db()->prepare('SELECT ' . $model::selectInfo('list') . ' FROM `' . $model::$_table . '` a ' . $search->sqlWhere() . ' ORDER BY `' . $pager->sortField . '` ' . $pager->sortDir . $pager->getSqlLimit());
-        $stmt->execute($search->params);
-        return $stmt;
-    }
-
-    public static function getOne($search, $for=NULL)
-    {
-        $model = get_called_class();
-
-        if ( is_object($search) && $search instanceof Search ) {
-            $where = $search->sqlWhere();
-            $params = $search->params;
-        } elseif ( is_array($search)) {
-            $where = ' WHERE ' . DBHelper::where($search);
-            $params = array();
-        } else {
-            $where = ' WHERE `' . $model::$_primaryKey . '` = ?';
-            $params = array($search);
+        if ( NULL !== $key) {
+            return isset($this->_config[$key]) ? $this->_config[$key] : null;
         }
-        $stmt = App::db()->prepare('SELECT ' . $model::selectInfo($for) . ' FROM `' . $model::$_table . '` a ' . $where . ' LIMIT 1');
-        $stmt->execute($params);
-        return $stmt->fetchObject($model);
+
+        return $this->_config;
     }
-    public static function getTable()
+
+    public function setConfig($props, $value=NULL)
     {
-        $model = get_called_class();
-        return $model::$_table;
+        if ( !is_array($props)) {
+            $this->_config[$props] = $value;
+            return;
+        }
+        foreach ($props as $key => $value) {
+            $this->_config[$key] = $value;
+        }
     }
-    public static function setTable($table)
+}
+abstract class ViewModel
+{
+    protected $m;
+    protected $baseUrl;
+
+    public function __construct($model, $baseUrl=NULL)
     {
-        $model = get_called_class();
-        $model::$_table = $table;
-    }
-    public static function getPrimaryKey()
-    {
-        $model = get_called_class();
-        return $model::$_primaryKey;
-    }
-    public static function setPrimaryKey($column)
-    {
-        $model = get_called_class();
-        $model::$_primaryKey = $column;
+        $this->m = $model;
+        $this->baseUrl = $baseUrl;
     }
 }
 class View
@@ -795,9 +764,95 @@ class DBHelper
         $array = explode(',', $str);
         return array_combine($array, $array);
     }
+
+    // Table Operations
+
+    public static function deleteAll($model, $ids)
+    {
+        $model = new $model;
+        $mconf = $model->getConfig();
+        App::db()->exec('DELETE FROM `' . $mconf['table'] . '` WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
+    }
+    public static function updateAll($model, $data, $ids)
+    {
+        $model = new $model;
+        $mconf = $model->getConfig();
+
+        $params = array();
+
+        $fields = array_keys($data);
+        $data = (object)$data;
+        $sql = DBHelper::toKeySetSql($data, $fields, $params);
+        $stmt = App::db()->prepare('UPDATE `' . $mconf['table'] . '` SET ' . $sql . ' WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
+        $stmt->execute($params);
+    }
+
+    public static function count($model, Search $search)
+    {
+        $model = new $model;
+        $mconf = $model->getConfig();
+
+        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $mconf['table'] . '` a ' . $search->sqlWhere() . ' LIMIT 1');
+        $stmt->execute($search->params);
+        return $stmt->fetchColumn();
+    }
+
+    public static function getList($model, Search $search, Pagination $pager=null, $for='list')
+    {
+        $model = new $model;
+        $mconf = $model->getConfig();
+
+        $pagerInfo = null;
+        if ( NULL !== $pager) {
+            $pagerInfo = ' ORDER BY `' . $pager->sortField . '` ' . $pager->sortDir . $pager->getSqlLimit();
+        }
+
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $search->sqlWhere() . $pagerInfo);
+        $stmt->execute($search->params);
+        return $stmt;
+    }
+
+    public static function getOne($model, $search, $for=NULL, $fetchIntoObject=NULL)
+    {
+        $model = new $model;
+        $mconf = $model->getConfig();
+
+        if ( is_object($search) && $search instanceof Search ) {
+            $where = $search->sqlWhere();
+            $params = $search->params;
+        } elseif ( is_array($search)) {
+            $where = ' WHERE ' . DBHelper::where($search);
+            $params = array();
+        } else {
+            $where = ' WHERE `' . $mconf['primaryKey'] . '` = ?';
+            $params = array($search);
+        }
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $stmt->execute($params);
+
+        if ( NULL !== $fetchIntoObject ) {
+            $stmt->setFetchMode(PDO::FETCH_INTO, $fetchIntoObject);
+            $stmt->fetch();
+            return $fetchIntoObject;
+        }
+
+        return $stmt->fetchObject(get_class($model));
+    }
+
+    public static function getFields($model, $for=null)
+    {
+        $model = new $model;
+        return $model->fields($for);
+    }
 } // END class
 class Validator
 {
+    /**
+     * 儲存圖片，若為圖片更新則會刪除舊圖片之後再存新圖
+     *
+     * @return void
+     * @author Me
+     */
     private static function __verifySaveImage($data, $key, $opt, &$input)
     {
         $label = $opt['label'];
@@ -808,13 +863,19 @@ class Validator
         App::loadHelper('GdImage', false, 'common');
 
         $fileKey = ! empty($opt['fileKey']) ? $opt['fileKey'] : $key;
-        if ( empty($_FILES[$fileKey]['tmp_name'])) {
+        if ( empty($_FILES[$fileKey]['name'])) {
             $input[$key] = $data->{$key};
             return;
         }
         // file upload
         $gd = new GdImage( $opt['dir'], $opt['dir'] );
-        $gd->generatedType = pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION);
+        $gd->generatedType = strtolower(pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION));
+
+        // check upload error
+        App::loadHelper('Upload', false, 'common');
+        $uploader = new Upload(null, null);
+        $uploader->checkError($_FILES[$fileKey]['error']);
+        unset($uploader);
 
         if ( ! $gd->checkImageExtension($fileKey)) {
             throw new Exception(sprintf(
@@ -840,18 +901,31 @@ class Validator
                     '<strong>' . HtmlValueEncode($label) . '</strong>'));
         }
         if ( $data->{$key}) { // 移除舊檔案
-            $gd->removeImage($data->{$key});
+            $file = $gd->processPath . $data->{$key};
+            if (file_exists($file)) {
+                unlink($file);
+            }
+            if ( isset($opt['thumbnails'])) {
+                $oldinfo = pathinfo($data->{$key});
+                foreach ($opt['thumbnails'] as $suffix => $sOpt)  {
+                    $file = $gd->processPath . $oldinfo['dirname'] . DIRECTORY_SEPARATOR . $oldinfo['filename'] . $suffix . '.' . $oldinfo['extension'];
+                    if ( file_exists($file)) {
+                        unlink($file);
+                    }
+                }
+            }
             $data->{$key} = $input[$key] = '';
         }
         $method = empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
         $info = pathinfo($source);
         $filename = $info['filename'];
-        $ext = $info['extension'];
+        $ext = strtolower($info['extension']);
         if (
             $gd->{$method}(
                 $source,
                 $opt['resize'][0], $opt['resize'][1],
-                $filename
+                $filename,
+                (isset($opt['cropFrom']) ? $opt['cropFrom'] : null)
             )
         ) {
             $data->{$key} = $input[$key] = $source;
@@ -865,7 +939,8 @@ class Validator
                     $gd->{$method}(
                         $source,
                         $sOpt['size'][0], $sOpt['size'][1],
-                        $filename . $suffix
+                        $filename . $suffix,
+                        (isset($sOpt['cropFrom']) ? $sOpt['cropFrom'] : null)
                     )
                 ) {
                     $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $ext;
@@ -911,6 +986,7 @@ class Validator
 
             $data->{$key} = $input[$key] = $uploader->save();
             $data->{$key.'_type'} = $input[$key.'_type'] = $uploader->getFileType();
+            $data->{$key.'_orignal_name'} = $input[$key.'_orignal_name'] = $uploader->getOrignalName();
 
             if ( ! is_array($data->{$key})) {
                 $data->_new_files[] = $opt['dir'] . DIRECTORY_SEPARATOR . $data->{$key};
@@ -957,12 +1033,12 @@ class Validator
                 if ( 'boolean' === $opt['type']) {
                     $data->{$key} = isset($input[$key]) ? (int)(boolean)$input[$key] : '0';
                     $is_empty = false;
-                } elseif ( 'multiple' !== $opt['type']) {
-                    $data->{$key} = isset($input[$key]) ? trim($input[$key]) : '';
-                    $is_empty = $data->{$key} === '';
-                } else {
+                } elseif ( 'multiple' === $opt['type']) {
                     $data->{$key} = isset($input[$key]) && is_array($input[$key]) ? $input[$key] : array();
                     $is_empty = empty($data->{$key});
+                } else {
+                    $data->{$key} = isset($input[$key]) ? trim($input[$key]) : '';
+                    $is_empty = $data->{$key} === '';
                 }
                 if ( ! $is_empty ) {
                     switch  ($opt['type']) {
@@ -1015,28 +1091,6 @@ class Validator
                             }
                         }
                     }
-                    if ( isset($opt['callbacks'])) {
-                        foreach ( $opt['callbacks'] as $ck => $func ) {
-                            if ( is_array($func)) {
-                                $params = $func;
-                                $func = $ck;
-                                array_unshift($params, $data->{$key});
-                            } else {
-                                $params = array($data->{$key});
-                            }
-                            try {
-                                if ( method_exists($data, $func)) { // $data->$func()
-                                    $data->{$key} = call_user_func_array(array($data, $func), $params);
-                                } else if ( method_exists(__CLASS__, $func)) { // Validator::$func()
-                                    $data->{$key} = call_user_func_array(array(__CLASS__, $func), $params);
-                                } else {
-                                    $data->{$key} = call_user_func_array($func, $params);
-                                }
-                            } catch ( Exception $ex ) {
-                                throw new Exception( '<strong>'.HtmlValueEncode($label).'</strong>: '. $ex->getMessage() );
-                            }
-                        }
-                    }
                 } else {
                     if ( array_key_exists('default', $opt) ) {
                         $data->{$key} = $opt['default'];
@@ -1046,7 +1100,9 @@ class Validator
                                 _e('%s: 不能為空'),
                                 '<strong>' . HtmlValueEncode($label) . '</strong>'));
                     }
+
                 }
+                self::_doCallbacks($opt, $data, $key);
 
             } catch ( Exception $ex ) {
                 $errors[] = '<li>' . $ex->getMessage() . '</li>';
@@ -1056,6 +1112,32 @@ class Validator
 
         if ( isset($errors[0])) {
             throw new Exception('<ul>'.implode("\n", $errors).'</ul>');
+        }
+    }
+    private static function _doCallbacks(&$opt, $data, $key)
+    {
+        if ( !isset($opt['callbacks'])) {
+            return;
+        }
+        foreach ( $opt['callbacks'] as $ck => $func ) {
+            if ( is_array($func)) {
+                $params = $func;
+                $func = $ck;
+                array_unshift($params, $data->{$key});
+            } else {
+                $params = array($data->{$key});
+            }
+            try {
+                if ( method_exists($data, $func)) { // $data->$func()
+                    $data->{$key} = call_user_func_array(array($data, $func), $params);
+                } else if ( method_exists(__CLASS__, $func)) { // Validator::$func()
+                    $data->{$key} = call_user_func_array(array(__CLASS__, $func), $params);
+                } else {
+                    $data->{$key} = call_user_func_array($func, $params);
+                }
+            } catch ( Exception $ex ) {
+                throw new Exception( '<strong>'.HtmlValueEncode($opt['label']).'</strong>: '. $ex->getMessage() );
+            }
         }
     }
     public static function requiredText($value)
@@ -1220,6 +1302,14 @@ class Urls
         }
         return $default;
     }
+    private function ___urltoIdReplacer($matches)
+    {
+        $paramName = $matches['name'];
+        if (isset($this->tmpRouteParams[$paramName])) {
+            return $this->tmpRouteParams[$paramName];
+        }
+        return App::route()->getDefault($paramName);
+    }
     public function urltoId($routeId, $routeParams=null, $urlParams=null, $options=array( 'fullurl' => false, 'argSeparator' => '&amp;'))
     {
         $route = App::route();
@@ -1228,15 +1318,12 @@ class Urls
             return null;
         }
 
-        $parsePattern = '#(\(\?P<(?P<name>[^>]+)>(?P<pattern>[^)]+)\)(?P<optional>[?])?)#';
-        $url = preg_replace_callback($parsePattern, function($matches) use($route, $routeParams){
-            $paramName = $matches['name'];
-            if (isset($routeParams[$paramName])) {
-                return $routeParams[$paramName];
-            }
-            return $route->getDefault($paramName);
-        }, $rule['pattern']);
+        $this->tmpRouteParams = $routeParams;
 
+        $parsePattern = '#(\(\?P<(?P<name>[^>]+)>(?P<pattern>[^)]+)\)(?P<optional>[?])?)#';
+        $url = preg_replace_callback($parsePattern, array($this, '___urltoIdReplacer'), $rule['pattern']);
+
+        unset($this->tmpRouteParams);
 
         if ('default' !== $routeId) {
             $url = str_replace(array('(/)?', '(', ')?'), '', $url);
@@ -1361,7 +1448,7 @@ class Route
     public function appendDefaultRoute()
     {
         // default route: {{controller}}/{{action}}/{{id}}.{{format}}
-        $pattern = '(?P<controller>[^./])?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(.(?P<format>[^/]+))?';
+        $pattern = '(?P<controller>[^./]+)?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(.(?P<format>[^/]+))?';
         $config = array('__id' => 'default');
 
         $this->_routes[$pattern] = $config;
@@ -1421,12 +1508,29 @@ class Route
 
     public function forwardTo($controller, $action)
     {
+        $this->addHistory($controller, $action);
+        self::acl()->check();
+        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
+    }
+    public function addHistory($controller, $action)
+    {
         $this->_history[] = array(
             'controller' => $_REQUEST['controller'],
             'action' => $_REQUEST['action']
         );
-        self::acl()->check();
-        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
+        $_REQUEST['controller'] = $controller;
+        $_REQUEST['action'] = $action;
+    }
+    public function getHistory($offset=null)
+    {
+        if ('last' === $offset) {
+            $length = sizeof($this->_history);
+            return !$length ? array() : $this->_history[$length-1];
+        }
+        if ('first' === $offset) {
+            return !isset($this->_history[0]) ? array() : $this->_history[0];
+        }
+        return $this->_history;
     }
 } // END class
 
@@ -1477,13 +1581,14 @@ class Acl
             }
 
             if ( false === strpos($rule['__failRoute'], '/')) {
-                $_REQUEST['controller'] = $rule['__failRoute'];
-                $_REQUEST['action'] = App::route()->getDefault('action');
+                $controller = $rule['__failRoute'];
+                $action = App::route()->getDefault('action');
             } else {
                 $route = explode('/', $rule['__failRoute']);
-                $_REQUEST['controller'] = $route[0];
-                $_REQUEST['action'] = $route[1];
+                $controller = $route[0];
+                $action = $route[1];
             }
+            App::route()->addHistory($controller, $action);
         }
     }
     private function _isAccessible($rule)

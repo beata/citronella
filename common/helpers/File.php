@@ -148,7 +148,7 @@ class File
             $bytes = $bytes / $decr;
             $step++;
         }
-        return round($bytes, 2) . ' ' . $unit[$step];
+        return round($bytes, 2) . $unit[$step];
     }
 
 

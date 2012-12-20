@@ -193,4 +193,8 @@ class Upload
     {
         return $_FILES[$this->fieldName]['type'];
     }
+    public function getOrignalName()
+    {
+        return $_FILES[$this->fieldName]['name'];
+    }
 }

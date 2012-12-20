@@ -1,6 +1,10 @@
 <?php
 error_reporting(E_ALL|E_STRICT);
 
+if ( phpversion() < 5.3) {
+    require_once dirname(__FILE__) . '/../sys/to_php53.php';
+}
+
 $config = array(
     'timezone' => 'Asia/Taipei',
     'encoding' => 'UTF-8',
@@ -10,6 +14,7 @@ $config = array(
     'enable_rewrite' => false,
     'cache_dir' => 'cache',
     'system_email' => 'noreply@localhost', // 系統的發信地址
+    'service_email' => 'service@localhost', // 客服信箱
     'site_name' => 'Site Name',
 
     // 設定資料庫
@@ -38,4 +43,4 @@ if ( ! defined('ASSETS_URL')) {
     define('ASSETS_URL', ROOT_URL . 'assets/');
     define('ASSETS_PATH', ROOT_PATH . 'assets' . DIRECTORY_SEPARATOR);
 }
-define('TRIM_MARKER', '&#8230;');
+define('TRIM_MARKER', '⋯');

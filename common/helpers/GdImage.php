@@ -395,7 +395,7 @@ class GdImage {
     }
 
 
-        public function adaptiveResizeCropExcess($file, $width=128, $height=128, $rename=''){
+        public function adaptiveResizeCropExcess($file, $width=128, $height=128, $rename='', $cropFrom='auto'){
         $file = $this->uploadPath . $file;
 
         $imginfo = $this->getInfo($file);
@@ -420,6 +420,9 @@ class GdImage {
             $srcW = $imginfo['width'];
             $srcH = round($height / ($width / $imginfo['width']));
             $srcY = round(($imginfo['height'] / 2) - ($srcH / 2));
+        }
+        if ( 'top' === $cropFrom) {
+            $srcY = 0;
         }
 
         //For GD version 2.0.1 only
@@ -827,7 +830,7 @@ class GdImage {
         if($img==Null)return;
 
         if (!file_exists($this->uploadPath)) {
-			App::loadHelper('File', false, 'common');
+            App::loadHelper('File', false, 'common');
             $fileManager = new File(0777);
             $fileManager->create($this->uploadPath);
         }
@@ -939,12 +942,12 @@ class GdImage {
         if(!empty($_FILES[$filename])){
             $name = $_FILES[$filename]['name'];
             if(is_array($name)===False){
-                $ext = pathinfo($name, PATHINFO_EXTENSION);
+                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
                 return in_array($ext, $allowExt);
             }
             else{
                 foreach($name as $nm){
-                    $ext = pathinfo($nm, PATHINFO_EXTENSION);
+                    $ext = strtolower(pathinfo($nm, PATHINFO_EXTENSION));
                     if(!in_array($ext, $allowExt)){
                         return false;
                     }

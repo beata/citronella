@@ -31,8 +31,8 @@ class Pagination
     public $numPerPage = 10;
     public $sortable = array();
 
-    public $symbalAsc = ' <i class="icon-sort-up" title="小至大"></i>';
-    public $symbalDesc = ' <i class="icon-sort-down" title="大至小"></i>';
+    public $symbalAsc = ' <i class="icon-chevron-up" title="小至大"></i>';
+    public $symbalDesc = ' <i class="icon-chevron-down" title="大至小"></i>';
 
     // readonly members
     public $currentPage = 0;
@@ -45,7 +45,7 @@ class Pagination
 
     public function __construct($config=array())
     {
-        if ( ! isset($config['rowsPerPage']) ) {
+        if ( ! array_key_exists('rowsPerPage', $config)) {
             $this->rowsPerPage = App::conf()->pagination->rows_per_page;
         }
         if ( ! isset($config['numPerPage']) ) {
@@ -96,11 +96,11 @@ class Pagination
         }
         return $limit;
     }
-    public function pages($showInfo=false)
+    public function pages($showInfo=false, $cssClass='')
     {
         if ( $this->totalPages < 2) {
             if ( $showInfo ) {
-                echo '<div class="pagination"><p class="pagination-info">', $this->info(), '</p></div>';
+                echo '<div class="pagination ', $cssClass, '"><p class="pagination-info">', $this->info(), '</p></div>';
             }
             return;
         }
@@ -113,7 +113,7 @@ class Pagination
         $numStart = max(1, $this->currentPage - $midNumber);
         $numEnd = min($this->totalPages, $numStart + $this->numPerPage);
 
-        echo '<div class="pagination"><ul>';
+        echo '<div class="pagination ', $cssClass, '"><ul>';
 
         $url = $urlparams
             ? '?' . $urlparams . '&amp;' . $this->param . '='

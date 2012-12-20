@@ -113,7 +113,7 @@ function HtmlClean($value)
         ));
 
         $config->set('Attr.AllowedFrameTargets', array('_blank'));
-        $config->set('Cache', 'SerializerPath', ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier');
+        $config->set('Cache.SerializerPath', ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier');
 
 		$def = $config->getHTMLDefinition(true);
 		$def->addAttribute('table', 'align', 'Enum#left,center,right');
@@ -172,22 +172,25 @@ function shorten_date($date, $date_format='Y-m-d', $time_format='H:i:s')
     }
     return $date;
 }
+function input_required($field)
+{
+    if ( $field['required']) {
+        return ' required="required"';
+    }
+    return '';
+}
 // System View Functions
 /**
  * 顯示 session 訊息
  *
  * @return void
  **/
-function fresh_message($close=true)
+function fresh_message($showDismiss=true)
 {
     if ( empty($_SESSION['fresh'])) {
         return;
     }
-    if ( $close ) {
-        alert_message($_SESSION['fresh'], 'success');
-    } else {
-        block_message($_SESSION['fresh'], 'success');
-    }
+    block_message($_SESSION['fresh'], 'success', $showDismiss);
     unset($_SESSION['fresh']);
 }
 /**
@@ -195,16 +198,12 @@ function fresh_message($close=true)
  *
  * @return void
  **/
-function block_message($message, $type = 'error') {
-    echo '<div class="alert alert-block alert-', $type,'">', $message, '</div>';
-}
-/**
- * 顯示有關閉按鈕的訊息區塊
- *
- * @return void
- **/
-function alert_message($message, $type = 'error') {
-    echo '<div class="alert alert-block alert-', $type,'"><a class="close" data-dismiss="alert" href="#">&times;</a>', $message, '</div>';
+function block_message($message, $type = 'error', $showDismiss=false) {
+    echo '<div class="alert alert-', $type,'">';
+    if ( $showDismiss ) {
+        echo '<a class="close" data-dismiss="alert" href="#">&times;</a>';
+    }
+    echo  $message, '</div>';
 }
 /**
  * 根據傳入的陣列印出 <option> 標籤
@@ -243,7 +242,7 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
         $value_enc = HtmlValueEncode($value);
         echo '<label class="',
             ( $inline ? 'inline ' : ''),
-            $type, ' nowrap"><input type="', $type, '" name="', $name,
+            $type, ' nowrap margin-right"><input type="', $type, '" name="', $name,
             ($type === 'checkbox' ? '[' . $value_enc . ']' : ''),
             '" value="', $value_enc, '"',
             (
@@ -336,19 +335,34 @@ function show_actions($actions, $default=NULL, $class='input-medium')
     echo '</select>';
 }
 
-function breadcrumbs($path)
+function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
 {
     $urls = App::urls();
 
-    $current = array_pop($path);
+    if ( ! $linkCurrent ) {
+        $current = array_pop($path);
+    }
 
     echo '<ul class="breadcrumb">';
+    if ( $beforeText) {
+        echo '<li>', HtmlValueEncode($beforeText), '<span class="divider">:</span></li>';
+    }
     if ( ! empty($path)) {
+        $size = count($path);
+        $count = 0;
         foreach ( $path as $node => $name) {
-            echo '<li><a href="' . $urls->urlto($node) . '">' . HtmlValueEncode($name) . '</a> <span class="divider">/</span></li>';
+            $count++;
+            echo '<li><a href="' . $urls->urlto($node) . '">' . HtmlValueEncode($name) . '</a>';
+            if ( !$linkCurrent || $count !== $size) {
+                echo ' <span class="divider">/</span>';
+            }
+            echo '</li>';
         }
     }
-    echo '<li>' . HtmlValueEncode($current) . '</li></ul>';
+    if ( ! $linkCurrent ) {
+        echo '<li>' . HtmlValueEncode($current) . '</li>';
+    }
+    echo '</ul>';
 }
 function search_input($searchby, $unsets=array())
 {
@@ -373,3 +387,17 @@ function search_input($searchby, $unsets=array())
 } // search_form
 
 // App View Functions
+function visitors_count($counter_id=1)
+{
+    $id = (int)$counter_id;
+    $visted_key = 'visited_' . $id;
+    $counter = new stdclass;
+    $counter->total = 0;
+
+    $db = App::db();
+    if ( ! isset($_SESSION[$visted_key]) || ! $_SESSION[$visted_key]) {
+        $_SESSION[$visted_key] = 1;
+        $db->exec('UPDATE `counter` SET `counts` = `counts` + 1 WHERE `id` = ' . $id);
+    }
+    return $db->query('SELECT `counts` FROM `counter` WHERE `id` = ' . $id)->fetchColumn();
+}
