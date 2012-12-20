@@ -33,7 +33,7 @@ $config = array(
     ),
 );
 
-define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+define('ROOT_PATH', dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR);
 define('SYS_PATH', ROOT_PATH . 'sys' . DIRECTORY_SEPARATOR);
 
 if ( ! defined('ROOT_URL')) {
