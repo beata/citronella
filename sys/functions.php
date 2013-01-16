@@ -39,7 +39,7 @@ function get_domain_url()
  * @param array $headerAfter 隨後輸出的 http header
  * @return void
  **/
-function redirect($location, $exit=true, $code=302, $headerBefore=NULL, $headerAfter=NULL)
+function redirect($location, $exit=true, $code=303, $headerBefore=NULL, $headerAfter=NULL)
 {
     if($headerBefore!==null){
         foreach($headerBefore as $h){
@@ -101,9 +101,6 @@ function HtmlClean($value)
         $config->set('HTML.SafeEmbed', true);
         $config->set('HTML.Trusted', true);
         $config->set('HTML.FlashAllowFullScreen', true);
-
-        $config->set('Attr.AllowedFrameTargets', array('_blank'));
-
         $config->set('HTML.AllowedModules', array(
             'CommonAttributes', 'Text', 'Hypertext', 'List',
             'Presentation', 'Edit', 'Bdo', 'Tables', 'Image',
@@ -115,12 +112,11 @@ function HtmlClean($value)
             'Name',
         ));
 
+        $config->set('Attr.AllowedFrameTargets', array('_blank'));
         $config->set('Cache.SerializerPath', ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier');
 
 		$def = $config->getHTMLDefinition(true);
 		$def->addAttribute('table', 'align', 'Enum#left,center,right');
-        $def->addElement('u', 'Inline', 'Inline', 'Common');
-        $def->addElement('strike', 'Inline', 'Inline', 'Common');
 
         $purifier = new HTMLPurifier($config);
     }
@@ -183,6 +179,10 @@ function input_required($field)
     }
     return '';
 }
+function currencyTW($number, $sign='NT$')
+{
+    return $sign . number_format($number);
+}
 // System View Functions
 /**
  * 顯示 session 訊息
@@ -240,8 +240,13 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
 {
     $inline = ($breakEvery !== 'block');
     $i = 0;
+
+    $input_attrs = $attrs;
     foreach ( $array as $value => $label)
     {
+        if ( is_array($attrs) && isset($attrs[$value])) {
+            $input_attrs = $attrs[$value];
+        }
         $i++;
         $value_enc = HtmlValueEncode($value);
         echo '<label class="',
@@ -254,7 +259,7 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
                 ( $type === 'radio' && $value == $default )
                 ? ' checked="checked"' : ''
             ),
-            ' ' . $attrs . ' />', HtmlEncode($label), '</label>';
+            ' ' . $input_attrs . ' />', HtmlEncode($label), '</label>';
         if ( $inline && $breakEvery && 0 === ($i%$breakEvery)) {
             echo '<br />';
         }
@@ -355,8 +360,13 @@ function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
         $size = count($path);
         $count = 0;
         foreach ( $path as $node => $name) {
+            $params = NULL;
+            if ( is_array($name)) {
+                $params = empty($name['params']) ? NULL : $name['params'];
+                $name = $name['name'];
+            }
             $count++;
-            echo '<li><a href="' . $urls->urlto($node) . '">' . HtmlValueEncode($name) . '</a>';
+            echo '<li><a href="' . $urls->urlto($node, $params) . '">' . HtmlValueEncode($name) . '</a>';
             if ( !$linkCurrent || $count !== $size) {
                 echo ' <span class="divider">/</span>';
             }

@@ -1,5 +1,5 @@
 <?php
-error_reporting(E_ALL|E_STRICT);
+error_reporting(E_ALL & ~E_NOTICE);
 
 if ( phpversion() < 5.3) {
     require_once dirname(__FILE__) . '/../sys/to_php53.php';

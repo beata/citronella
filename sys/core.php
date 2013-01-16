@@ -238,7 +238,7 @@ abstract class Controller
     }
     public function _appendTitle($title, $sep = array())
     {
-        $sep = array_merge(array( 'pageTitleSep' => '-', 'windowTitleSep' => '|'), $sep);
+        $sep = array_merge(array( 'pageTitleSep' => '-', 'windowTitleSep' => ' | '), $sep);
         $this->data['page_title'] .= ' ' . $sep['pageTitleSep'] . ' ' . $title;
         $this->data['window_title'] = $title . $sep['windowTitleSep'] . $this->data['window_title'];
     }
@@ -306,7 +306,7 @@ abstract class Model
     );
 
     /*
-    public function beforeVerify(&$field, &$input=NULL, $args) {}
+    public function beforeVerify(&$fields, &$input=NULL, $args) {}
     public function beforeSave(&$fields, $args) {}
     public function afterSave(&$fields, &$input, $args) {}
     */
@@ -485,8 +485,8 @@ class View
     public function render($viewFile, $data=array(), $options=array())
     {
         $layout = 'layout';
-        $appId = NULL;
-        $layoutAppId = NULL;
+        $appId = App::$id;
+        $layoutAppId = App::$id;
         $return = false;
         extract($options, EXTR_IF_EXISTS);
 
@@ -771,9 +771,17 @@ class DBHelper
     {
         $model = new $model;
         $mconf = $model->getConfig();
-        App::db()->exec('DELETE FROM `' . $mconf['table'] . '` WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
+
+        if ( is_object($ids) && is_a($ids, 'Search')) {
+            $where = $search->sqlWhere();
+            $stmt = App::db()->prepare('DELETE FROM `' . $mconf['table'] . '` ' . $where);
+            $stmt->execute($search->params);
+        } else {
+            $where = 'WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids);
+            App::db()->exec('DELETE FROM `' . $mconf['table'] . '` ' . $where);
+        }
     }
-    public static function updateAll($model, $data, $ids)
+    public static function updateAll($model, $data, $ids, $rawValueFields=NULL)
     {
         $model = new $model;
         $mconf = $model->getConfig();
@@ -782,7 +790,7 @@ class DBHelper
 
         $fields = array_keys($data);
         $data = (object)$data;
-        $sql = DBHelper::toKeySetSql($data, $fields, $params);
+        $sql = DBHelper::toKeySetSql($data, $fields, $params, $rawValueFields);
         $stmt = App::db()->prepare('UPDATE `' . $mconf['table'] . '` SET ' . $sql . ' WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
         $stmt->execute($params);
     }
@@ -843,6 +851,14 @@ class DBHelper
     {
         $model = new $model;
         return $model->fields($for);
+    }
+    public static function toKeyPair(PDOStatement $resource, $keyColumn='id', $valueColumn='name')
+    {
+        $result = array();
+        while ( $item = $resource->fetch()) {
+            $result[$item->{$keyColumn}] = $item->{$valueColumn};
+        }
+        return $result;
     }
 } // END class
 class Validator
@@ -1161,7 +1177,7 @@ class Validator
         }
         return $value;
     }
-    public static function date($value, $foramt='yyyy/mm/dd', $forceYearLength=false)
+    public static function date($value, $format='yyyy/mm/dd', $forceYearLength=false)
     {
         //Date yyyy-mm-dd, yyyy/mm/dd, yyyy.mm.dd
         //1900-01-01 through 2099-12-31
@@ -1211,6 +1227,58 @@ class Validator
         return $value;
     }
 
+    public static function idNumber($value, $identityType='id')
+    {
+        if ( ! self::_idNumber($value, $identityType)) {
+            throw new Exception('請輸入有效的證件編號');
+        }
+        return $value;
+    }
+
+    private static function _idNumber($value, $identityType='id')
+    {
+        if ( 'passport' === $identityType ) {
+            return strlen($value) <= 20;
+        }
+        $number = strtoupper($value);
+        $isArcNumber = 'arc' === $identityType;
+
+        $pattern = !$isArcNumber ? "/^[A-Z][12][0-9]{8}$/" : "/^[A-Z][A-D][0-9]{8}$/";
+        if ( ! preg_match($pattern, $number)) {
+            return false;
+        }
+        unset($pattern);
+
+        $cities = array(
+            'A'=>10, 'B'=>11, 'C'=>12, 'D'=>13, 'E'=>14, 'F'=>15, 'G'=>16, 'H'=>17, 'I'=>34, 'J'=>18,
+            'K'=>19, 'L'=>20, 'M'=>21, 'N'=>22, 'O'=>35, 'P'=>23, 'Q'=>24, 'R'=>25, 'S'=>26, 'T'=>27,
+            'U'=>28, 'V'=>29, 'W'=>32, 'X'=>30, 'Y'=>31, 'Z'=>33
+        );
+        $sum = 0;
+
+        // 計算縣市加權
+        $city = $cities[$number{0}];
+        $sum += floor($city / 10) + ($city % 10 * 9);
+
+        // 計算性別加權
+        if ( !$isArcNumber ) {
+            $sum +=  (int)$number{1} * 8;
+        } else {
+            $gender = $cities[$number{1}];
+            $sum += ($gender % 10 * 8);
+            unset($gender);
+        }
+
+        // 計算中間值的加權
+        for ( $i=2; $i<=8; $i++) {
+            $sum +=  (int)$number{$i} * (9-$i);
+        }
+
+        // 加上檢查碼
+        $sum += (int)$number{9};
+
+        return ($sum % 10 === 0);
+    }
 }
 class Urls
 {
@@ -1398,7 +1466,7 @@ class Urls
      * @param array $headerBefore Headers to be sent before header("Location: some_url_address");
      * @param array $headerAfter Headers to be sent after header("Location: some_url_address");
      */
-    public function redirect($routeuri, $exit=true, $code=302, $headerBefore=NULL, $headerAfter=NULL)
+    public function redirect($routeuri, $exit=true, $code=303, $headerBefore=NULL, $headerAfter=NULL)
     {
         redirect($this->urlto($routeuri), $exit, $code, $headerBefore, $headerAfter);
     }
@@ -1448,7 +1516,7 @@ class Route
     public function appendDefaultRoute()
     {
         // default route: {{controller}}/{{action}}/{{id}}.{{format}}
-        $pattern = '(?P<controller>[^./]+)?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(.(?P<format>[^/]+))?';
+        $pattern = '(?P<controller>[^./]+)?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(\.(?P<format>[^/]+))?';
         $config = array('__id' => 'default');
 
         $this->_routes[$pattern] = $config;
