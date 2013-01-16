@@ -96,7 +96,7 @@ class Pagination
         }
         return $limit;
     }
-    public function pages($showInfo=false, $cssClass='')
+    public function pages($showInfo=false, $cssClass='pagination-centered')
     {
         if ( $this->totalPages < 2) {
             if ( $showInfo ) {
