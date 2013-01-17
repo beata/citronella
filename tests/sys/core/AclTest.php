@@ -1,10 +1,10 @@
 <?php
 require_once 'PHPUnit/Framework/TestCase.php';
-require_once __DIR__ . '/../../sys/functions.php';
-require_once __DIR__ . '/../../sys/core.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../../sys/functions.php';
+require_once __DIR__ . '/../../../sys/core.php';
+require_once __DIR__ . '/../../config/config.php';
 
-class CoreAclTest extends PHPUnit_Framework_TestCase
+class Sys_Core_AclTest extends PHPUnit_Framework_TestCase
 {
     public function setUp()
     {

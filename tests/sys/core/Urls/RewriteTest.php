@@ -1,14 +1,26 @@
 <?php
 require_once 'PHPUnit/Framework/TestCase.php';
-require_once __DIR__ . '/../../sys/functions.php';
-require_once __DIR__ . '/../../sys/core.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../../../sys/functions.php';
+require_once __DIR__ . '/../../../../sys/core.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-class CoreUrlsTest extends PHPUnit_Framework_TestCase
+class Sys_Core_Urls_RewriteTest extends PHPUnit_Framework_TestCase
 {
+    private static $origEnv;
+
     public static function setUpBeforeClass()
     {
-        $GLOBALS['config']['enable_rewrite'] = false;
+        self::$origEnv['enable_rewrite'] = $GLOBALS['config']['enable_rewrite'];
+        self::$origEnv['env_rewrite'] = getenv('HTTP_MOD_REWRITE');
+
+        $GLOBALS['config']['enable_rewrite'] = App::conf()->enable_rewrite = true;
+        putenv('HTTP_MOD_REWRITE=On');
+    }
+
+    public static function tearDownAfterClass()
+    {
+        putenv('HTTP_MOD_REWRITE=' .  self::$origEnv['env_rewrite']);
+        $GLOBALS['config']['enable_rewrite'] = App::conf()->enable_rewrite = self::$origEnv['enable_rewrite'];
     }
 
     public function testConstructor()
@@ -24,7 +36,7 @@ class CoreUrlsTest extends PHPUnit_Framework_TestCase
 
         $this->assertEquals('/tests/', $_urlBase->getValue($urls));
         $this->assertEquals($GLOBALS['config']['enable_rewrite'], $_modRewriteEnabled->getValue($urls));
-        $this->assertFalse($_modRewriteEnabled->getValue($urls));
+        $this->assertTrue($_modRewriteEnabled->getValue($urls));
         $this->assertEquals('s', $_paramName->getValue($urls));
 
         // case 1
@@ -66,32 +78,33 @@ class CoreUrlsTest extends PHPUnit_Framework_TestCase
         $urls = new Urls('/tests', 'q');
 
         // case 1
-        $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));
+        $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));
 
         // case 2
         $urls->setQueryStringPrefix('pre');
-        $this->assertEquals('/tests/?q=pre', $urls->urlto(''));
-        $this->assertEquals('/tests/?q=pre/a/b', $urls->urlto('a/b'));
+        $this->assertEquals('/tests/pre', $urls->urlto(''));
+        $this->assertEquals('/tests/pre/a/b', $urls->urlto('a/b'));
         $urls->setQueryStringPrefix(null);
 
         // case 3
-        $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));
-        $this->assertEquals('/tests/?p1=v1&amp;p2=v2&amp;q=a/b', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2')));
+        $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));
+        $this->assertEquals('/tests/a/b?p1=v1&amp;p2=v2', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2')));
 
 
         // case 4
-        $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));
-        $this->assertEquals('/tests/?p1=v1&p2=v2&q=a/b', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2'), array('argSeparator' => '&')));
+        $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));
+        $this->assertEquals('/tests/a/b?p1=v1&p2=v2', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2'), array('argSeparator' => '&')));
 
 
         // case 5
-        $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));
+        $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));
         $_REQUEST['is_ssl'] = true;
         $_SERVER['HTTP_HOST'] = 'example.com';
-        $this->assertEquals('https://example.com/tests/?q=a/b', $urls->urlto('a/b', null, array('fullurl' => true)));
+        $this->assertEquals('https://example.com/tests/a/b', $urls->urlto('a/b', null, array('fullurl' => true)));
 
         // case 6
         unset($_REQUEST['is_ssl']);
-        $this->assertEquals('http://example.com/tests/?q=a/b', $urls->urlto('a/b', null, array('fullurl' => true)));
+        $this->assertEquals('http://example.com/tests/a/b', $urls->urlto('a/b', null, array('fullurl' => true)));
     }
+
 }

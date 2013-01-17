@@ -1,15 +1,28 @@
 <?php
 require_once 'PHPUnit/Framework/TestCase.php';
-require_once __DIR__ . '/../../sys/functions.php';
-require_once __DIR__ . '/../../sys/core.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../../../sys/functions.php';
+require_once __DIR__ . '/../../../../sys/core.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-class CoreUrlsTest extends PHPUnit_Framework_TestCase
+class Sys_Core_Urls_NamedRoutesTest extends PHPUnit_Framework_TestCase
 {
+    private static $origEnv;
+
     public static function setUpBeforeClass()
     {
+        self::$origEnv['SERVER_SOFTWARE'] = isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : null;
+        self::$origEnv['enable_rewrite'] = $GLOBALS['config']['enable_rewrite'];
+
         $_SERVER['SERVER_SOFTWARE'] = 'apache';
-        $GLOBALS['config']['enable_rewrite'] = false;
+        $GLOBALS['config']['enable_rewrite'] = App::conf()->enable_rewrite = false;
+    }
+    public static function tearDownAfterClass()
+    {
+        $_SERVER['SERVER_SOFTWARE'] = self::$origEnv['SERVER_SOFTWARE'];
+        if ( NULL === $_SERVER['SERVER_SOFTWARE']) {
+            unset($_SERVER['SERVER_SOFTWARE']);
+        }
+        $GLOBALS['config']['enable_rewrite'] = App::conf()->enable_rewrite = self::$origEnv['enable_rewrite'];
     }
 
     public function setUp()
