@@ -594,12 +594,18 @@ class DBHelper
         if ( sizeof($array) === 0) {
             return;
         }
-        return $field . " IN ('".implode("', '", $array)."')";
+        return $field . ' IN (' . implode(',', array_map(array(App::db(), 'quote'), $array)) . ')';
     }
+
     public static function orWhere($array)
     {
         $db = App::db();
         $sql = array();
+
+        if ( empty($array)) {
+            return '1=1';
+        }
+
         foreach ( $array as $key => $value) {
             if ( is_array($value) ) {
                 if ( count($value) > 1) {
