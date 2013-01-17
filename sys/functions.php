@@ -101,6 +101,10 @@ function HtmlClean($value)
         $config->set('HTML.SafeEmbed', true);
         $config->set('HTML.Trusted', true);
         $config->set('HTML.FlashAllowFullScreen', true);
+
+        $config->set('Attr.EnableID', true);
+        $config->set('Attr.AllowedFrameTargets', array('_blank'));
+
         $config->set('HTML.AllowedModules', array(
             'CommonAttributes', 'Text', 'Hypertext', 'List',
             'Presentation', 'Edit', 'Bdo', 'Tables', 'Image',
@@ -112,11 +116,12 @@ function HtmlClean($value)
             'Name',
         ));
 
-        $config->set('Attr.AllowedFrameTargets', array('_blank'));
         $config->set('Cache.SerializerPath', ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier');
 
 		$def = $config->getHTMLDefinition(true);
 		$def->addAttribute('table', 'align', 'Enum#left,center,right');
+        $def->addElement('u', 'Inline', 'Inline', 'Common');
+        $def->addElement('strike', 'Inline', 'Inline', 'Common');
 
         $purifier = new HTMLPurifier($config);
     }
