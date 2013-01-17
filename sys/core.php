@@ -111,6 +111,9 @@ class App
         if ( NULL === $route ) {
             $route = new Route($routeConfig);
             $route->appendDefaultRoute();
+        } elseif ( NULL !== $routeConfig ) {
+            $route->setRoutes($routeConfig);
+            $route->appendDefaultRoute();
         }
         return $route;
     }
@@ -1394,7 +1397,7 @@ class Urls
         unset($this->tmpRouteParams);
 
         if ('default' !== $routeId) {
-            $url = str_replace(array('(/)?', '(', ')?'), '', $url);
+            $url = str_replace(array('(/)?', '(', ')?', '\\'), '', $url);
             return $this->urlto($url, $urlParams, $options);
         }
 
@@ -1403,9 +1406,9 @@ class Urls
             $strips[] = '(/' . $route->getDefault('action') . ')?';
         }
         if ( !isset($routeParams['format'])) {
-            $strips[] = '(.' . $route->getDefault('format') . ')?';
+            $strips[] = '(\.' . $route->getDefault('format') . ')?';
         }
-        array_push($strips, '(', ')?');
+        array_push($strips, '(', ')?', '\\');
         $url = str_replace($strips, '', $url);
         if ( !isset($routeParams['controller']) && $url === $route->getDefault('controller')) {
             $url = '';
@@ -1515,7 +1518,9 @@ class Route
     }
     public function appendDefaultRoute()
     {
+        // remember that if you changed default route pattern, you have to modify the Route::urltoId method
         // default route: {{controller}}/{{action}}/{{id}}.{{format}}
+
         $pattern = '(?P<controller>[^./]+)?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(\.(?P<format>[^/]+))?';
         $config = array('__id' => 'default');
 
