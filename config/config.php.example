@@ -1,5 +1,8 @@
 <?php
-error_reporting(E_ALL & ~E_NOTICE);
+// Development value
+// error_reporting(E_ALL | E_STRICT);
+// Production value
+// error_reporting(E_ALL & ~E_DEPRECATED);
 
 if ( phpversion() < 5.3) {
     require_once dirname(__FILE__) . '/../sys/to_php53.php';
