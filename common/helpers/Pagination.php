@@ -38,6 +38,7 @@ class Pagination
     public $currentPage = 0;
     public $totalPages = 0;
     public $rowStart = 0;
+    public $groupBy;
 
     public $info;
     public $infoFormat = '有 %s 筆資料，總共 %s 頁';
@@ -95,6 +96,13 @@ class Pagination
             $limit = ' LIMIT ' . $this->rowStart . ',' . $this->rowsPerPage;
         }
         return $limit;
+    }
+    public function getSqlGroupBy()
+    {
+        if ( $this->groupBy) {
+            return ' GROUP BY ' . $this->groupBy;
+        }
+        return '';
     }
     public function pages($showInfo=false, $cssClass='pagination-centered')
     {

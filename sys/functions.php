@@ -121,7 +121,12 @@ function HtmlClean($value)
 		$def = $config->getHTMLDefinition(true);
 		$def->addAttribute('table', 'align', 'Enum#left,center,right');
         $def->addElement('u', 'Inline', 'Inline', 'Common');
+        $def->addElement('s', 'Inline', 'Inline', 'Common');
         $def->addElement('strike', 'Inline', 'Inline', 'Common');
+        $def->addElement('font', 'Inline', 'Inline', 'Common');
+        $def->addAttribute('font', 'color', 'Color');
+        $def->addAttribute('font', 'face', 'Text');
+        $def->addAttribute('font', 'size', 'Text');
 
         $purifier = new HTMLPurifier($config);
     }
@@ -165,15 +170,18 @@ function camelize($str, $upper_first = true)
     }
     return $str;
 }
-function shorten_date($date, $date_format='Y-m-d', $time_format='H:i:s')
+function shorten_date($date, $callback=NULL, $date_format='Y/m/d', $time_format='H:i:s')
 {
     if ( ! $date) {
         return '';
     }
     $time = strtotime($date);
     $date = date($date_format, $time);
-    if ( date($date_format) === $date) {
+    if ( date($date_format) === $date) { // return only time if the date is today
         return date($time_format, $time);
+    }
+    if ( $callback ) {
+        $date = $callback($date);
     }
     return $date;
 }
@@ -187,6 +195,38 @@ function input_required($field)
 function currencyTW($number, $sign='NT$')
 {
     return $sign . number_format($number);
+}
+function dateTW($date, $text=FALSE)
+{
+    $timeTW = strtotime($date);
+
+    $year = (int)date('Y', $timeTW) - 1911;
+
+    if ( FALSE === $text) {
+        return $year . date('/m/d', $timeTW);
+    }
+    $era = 'era' === $text ? '民國' : '';
+    return $era . $year . '年' . date('m', $timeTW) . '月' . date('d', $timeTW) . '日';
+}
+
+function datetimeTW($timeString, $text=FALSE, $time_format='H:i:s')
+{
+    if ( ! $timeString) {
+        return '';
+    }
+    $time = strtotime($timeString);
+    if ( FALSE === $text ) {
+        $time = ' ' . date($time_format, $time);
+    } else {
+        if ( FALSE === strpos($time_format, ':s')) {
+            $time_format = 'h點i分';
+        } else {
+            $time_format = 'h點i分s秒';
+        }
+        $time = (date('A', $time) === 'AM' ? '上午' : '下午') . date($time_format, $time);
+    }
+
+    return dateTW($timeString, $text) . $time;
 }
 // System View Functions
 /**
@@ -280,7 +320,13 @@ function html_hidden_inputs($params, $ignores=NULL)
         }
     }
     foreach ( $params as $name => $value) {
-        echo '<input type="hidden" name="', HtmlValueEncode($name), '" value="', HtmlValueEncode($value), '" />';
+        if ( !is_array($value)) {
+            echo '<input type="hidden" name="', HtmlValueEncode($name), '" value="', HtmlValueEncode($value), '" />';
+            continue;
+        }
+        foreach ( $value as $vName => $vValue) {
+            echo '<input type="hidden" name="', HtmlValueEncode($name), '[', HtmlValueEncode($vName), ']" value="', HtmlValueEncode($vValue), '" />';
+        }
     }
 }
 /**
@@ -357,9 +403,9 @@ function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
         $current = array_pop($path);
     }
 
-    echo '<ul class="breadcrumb">';
+    echo '<ul class="breadcrumb margin-bottom">';
     if ( $beforeText) {
-        echo '<li>', HtmlValueEncode($beforeText), '<span class="divider">:</span></li>';
+        echo '<li>', HtmlValueEncode($beforeText), '<span class="divider">/</span></li>';
     }
     if ( ! empty($path)) {
         $size = count($path);
@@ -406,17 +452,3 @@ function search_input($searchby, $unsets=array())
 } // search_form
 
 // App View Functions
-function visitors_count($counter_id=1)
-{
-    $id = (int)$counter_id;
-    $visted_key = 'visited_' . $id;
-    $counter = new stdclass;
-    $counter->total = 0;
-
-    $db = App::db();
-    if ( ! isset($_SESSION[$visted_key]) || ! $_SESSION[$visted_key]) {
-        $_SESSION[$visted_key] = 1;
-        $db->exec('UPDATE `counter` SET `counts` = `counts` + 1 WHERE `id` = ' . $id);
-    }
-    return $db->query('SELECT `counts` FROM `counter` WHERE `id` = ' . $id)->fetchColumn();
-}

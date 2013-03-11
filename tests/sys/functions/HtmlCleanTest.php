@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../../sys/core.php';
 require_once __DIR__ . '/../../config/config.php';
 
 
-class Sys_Functions_HtmlEncodeTest extends PHPUnit_Framework_TestCase
+class Sys_Functions_HtmlCleanTest extends PHPUnit_Framework_TestCase
 {
     public function testAttr_EnableID()
     {
@@ -50,6 +50,14 @@ class Sys_Functions_HtmlEncodeTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($string, HtmlClean($string));
     }
 
+    public function testFont()
+    {
+        $string = '<font style="color:#FF0000;">Font</font>';
+        $this->assertEquals($string, HtmlClean($string));
+
+        $string = '<font face="標楷體" size="5" color="#FF0000">Font</font>';
+        $this->assertEquals($string, HtmlClean($string));
+    }
 
     public function testAll()
     {

@@ -208,7 +208,10 @@ abstract class Controller
     }
     public function _show404($backLink=false, $layout='layout')
     {
-        header('404 Not Found');
+        if ( FALSE === $_SERVER['IS_IIS'] ) {
+            header('HTTP/1.0 404 Not Found', true, 404);
+            header('Status: 404');
+        }
         $this->data['page_title'] = $this->data['window_title'] = _e('404 頁面不存在!');
         $this->_showError(_e('您所要檢視的頁面不存在！'), $backLink, $layout);
     }
@@ -310,7 +313,7 @@ abstract class Model
 
     /*
     public function beforeVerify(&$fields, &$input=NULL, $args) {}
-    public function beforeSave(&$fields, $args) {}
+    public function beforeSave(&$fields, &$input, $args) {}
     public function afterSave(&$fields, &$input, $args) {}
     */
 
@@ -332,7 +335,7 @@ abstract class Model
         }
 
         if ( method_exists($this, 'beforeSave')) {
-            $this->beforeSave($fields, $args);
+            $this->beforeSave($fields, $input, $args);
         }
 
         if ( ! $this->hasPrimaryKey()) {
@@ -476,9 +479,10 @@ class View
     {
         return file_get_contents( $this->getDir($appId) . $viewFile);
     }
-    public function load($viewFile, $appId=NULL)
+    public function load($viewFile, $appId=NULL, $subViewData=array())
     {
         extract($this->data);
+        extract($subViewData);
         if ( false === strpos($viewFile, '.')) {
             include $this->getDir($appId) . $viewFile . '.html';
         } else {
@@ -774,6 +778,22 @@ class DBHelper
         return array_combine($array, $array);
     }
 
+    public static function fetchKeyedList(PDOStatement $stmt, $keyColumn='id', $displayColumn=NULL)
+    {
+        $list = array();
+
+        if ( NULL === $displayColumn) {
+            while ( $item = $stmt->fetch()) {
+                $list[$item->{$keyColumn}] = $item;
+            }
+        } else {
+            while ( $item = $stmt->fetch()) {
+                $list[$item->{$keyColumn}] = $item->{$displayColumn};
+            }
+        }
+
+        return $list;
+    }
     // Table Operations
 
     public static function deleteAll($model, $ids)
@@ -804,46 +824,48 @@ class DBHelper
         $stmt->execute($params);
     }
 
-    public static function count($model, Search $search)
+    public static function count($model, $search)
     {
+        $where = $params = NULL;
+        extract(self::translateModelSearchArg($model, $search));
+
         $model = new $model;
         $mconf = $model->getConfig();
 
-        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $mconf['table'] . '` a ' . $search->sqlWhere() . ' LIMIT 1');
-        $stmt->execute($search->params);
+        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $stmt->execute($params);
         return $stmt->fetchColumn();
     }
 
-    public static function getList($model, Search $search, Pagination $pager=null, $for='list')
+    public static function getList($model, $search=NULL, Pagination $pager=NULL, $for='list')
     {
+        $where = $params = NULL;
+        extract(self::translateModelSearchArg($model, $search));
+
         $model = new $model;
         $mconf = $model->getConfig();
 
         $pagerInfo = null;
+
         if ( NULL !== $pager) {
-            $pagerInfo = ' ORDER BY `' . $pager->sortField . '` ' . $pager->sortDir . $pager->getSqlLimit();
+           $pagerInfo = $pager->getSqlGroupBy() . ' ORDER BY `' . $pager->sortField . '` ' . $pager->sortDir . $pager->getSqlLimit();
+        } elseif (isset($mconf['primaryKey'])) {
+            $pagerInfo = ' ORDER BY `' . $mconf['primaryKey'] . '` ASC';
         }
 
-        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $search->sqlWhere() . $pagerInfo);
-        $stmt->execute($search->params);
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
+        $stmt->execute($params);
         return $stmt;
     }
 
     public static function getOne($model, $search, $for=NULL, $fetchIntoObject=NULL)
     {
+        $where = $params = NULL;
+        extract(self::translateModelSearchArg($model, $search));
+
         $model = new $model;
         $mconf = $model->getConfig();
 
-        if ( is_object($search) && $search instanceof Search ) {
-            $where = $search->sqlWhere();
-            $params = $search->params;
-        } elseif ( is_array($search)) {
-            $where = ' WHERE ' . DBHelper::where($search);
-            $params = array();
-        } else {
-            $where = ' WHERE `' . $mconf['primaryKey'] . '` = ?';
-            $params = array($search);
-        }
         $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
         $stmt->execute($params);
 
@@ -868,6 +890,22 @@ class DBHelper
             $result[$item->{$keyColumn}] = $item->{$valueColumn};
         }
         return $result;
+    }
+    public static function translateModelSearchArg($model, $search)
+    {
+        if ( is_object($search) && $search instanceof Search ) {
+            $where = $search->sqlWhere();
+            $params = $search->params;
+        } elseif ( is_array($search)) {
+            $where = ' WHERE ' . DBHelper::where($search);
+            $params = array();
+        } else {
+            $model = new $model;
+            $mconf = $model->getConfig();
+            $where = ' WHERE `' . $mconf['primaryKey'] . '` = ?';
+            $params = array($search);
+        }
+        return compact('where', 'params');
     }
 } // END class
 class Validator
@@ -1004,12 +1042,13 @@ class Validator
         }
 
         try {
-            if ( $data->{$key}) { // 移除舊檔案
-                unlink($opt['dir'] . $data->{$key});
-                $data->{$key} = $input[$key] = '';
-            }
+            $oldFile = $data->{$key};
+            $newFile = $uploader->save();
 
-            $data->{$key} = $input[$key] = $uploader->save();
+            if ( $oldFile ) { // 移除舊檔案
+                unlink($opt['dir'] . $oldFile);
+            }
+            $data->{$key} = $input[$key] = $newFile;
             $data->{$key.'_type'} = $input[$key.'_type'] = $uploader->getFileType();
             $data->{$key.'_orignal_name'} = $input[$key.'_orignal_name'] = $uploader->getOrignalName();
 
@@ -1287,6 +1326,39 @@ class Validator
         $sum += (int)$number{9};
 
         return ($sum % 10 === 0);
+    }
+
+    public static function NullOrHasRecord($value, $model, $search=NULL)
+    {
+        if ( NULL === $value) {
+            return $value;
+        }
+        return self::hasRecord($value, $model, $search);
+    }
+
+    public static function hasRecord($value, $model, $search=NULL)
+    {
+        if ( ! class_exists($model)) {
+            App::loadModel($model);
+        }
+
+        $tmpModel = new $model;
+        $mconf = $tmpModel->getConfig();
+        unset($tmpModel);
+
+        if ( is_object($search) && $search instanceof Search) {
+            array_unshift($search->where, $mconf['primaryKey']);
+            array_unshift($search->params, $value);
+        } elseif ( is_array($search) ){
+            array_merge(array($mconf['primaryKey'] => $value), $search);
+        } else {
+            $search = $value;
+        }
+
+        if ( ! DBHelper::count($model, $search) ) {
+            throw new Exception('資料不存在');
+        }
+        return $value;
     }
 }
 class Urls
