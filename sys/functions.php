@@ -93,7 +93,6 @@ function HtmlClean($value)
         App::loadHelper('htmlpurifier/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
         $config = HTMLPurifier_Config::createDefault();
 
-        $config->set('Core.EscapeInvalidTags', true);
         $config->set('Output.FlashCompat', true);
         $config->set('Filter.YouTube', true);
 
