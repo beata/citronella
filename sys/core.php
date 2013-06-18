@@ -827,7 +827,7 @@ class DBHelper
         if ( ! $stmt->rowCount()) {
             return;
         }
-        while ( $item = $stmt->fetch()) {
+        while ( $item = $stmt->fetch(PDO::FETCH_OBJ)) {
             foreach ( $columns as $column) {
                 if ( ! $item->{$column}) {
                     continue;
@@ -869,11 +869,11 @@ class DBHelper
         $list = array();
 
         if ( NULL === $displayColumn) {
-            while ( $item = $stmt->fetch()) {
+            while ( $item = $stmt->fetch(PDO::FETCH_OBJ)) {
                 $list[$item->{$keyColumn}] = $item;
             }
         } else {
-            while ( $item = $stmt->fetch()) {
+            while ( $item = $stmt->fetch(PDO::FETCH_OBJ)) {
                 $list[$item->{$keyColumn}] = $item->{$displayColumn};
             }
         }
@@ -958,7 +958,7 @@ class DBHelper
 
         if ( NULL !== $fetchIntoObject ) {
             $stmt->setFetchMode(PDO::FETCH_INTO, $fetchIntoObject);
-            $stmt->fetch();
+            $stmt->fetch(PDO::FETCH_OBJ);
             return $fetchIntoObject;
         }
 
@@ -973,7 +973,7 @@ class DBHelper
     public static function toKeyPair(PDOStatement $resource, $keyColumn='id', $valueColumn='name')
     {
         $result = array();
-        while ( $item = $resource->fetch()) {
+        while ( $item = $resource->fetch(PDO::FETCH_OBJ)) {
             $result[$item->{$keyColumn}] = $item->{$valueColumn};
         }
         return $result;
