@@ -33,6 +33,12 @@ $config = array(
     'pagination' => array(
         'rows_per_page'     => 20,      // 每頁顯示20筆資料
         'num_per_page'      => 10,      // 每次顯示10個頁碼
+        'icon_labels' => array(
+            'first' => '<i class="icon-fast-backward"></i>',
+            'prev' => '<i class="icon-backward"></i>',
+            'next' => '<i class="icon-forward"></i>',
+            'last' => '<i class="icon-fast-forward"></i>',
+        )
     ),
 );
 

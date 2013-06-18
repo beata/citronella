@@ -30,16 +30,16 @@ abstract class Attachment extends Model
     {
         return array(
             'name' => array(
-                'label' => '檔案名稱', 'required' => false
+                'label' => __('檔案名稱'), 'required' => false
             ),
             'description' => array(
-                'label' => '檔案簡述', 'required' => false,
+                'label' => __('檔案簡述'), 'required' => false,
             ),
             'mime' => array(
-                'label' => '檔案類型', 'required' => false,
+                'label' => __('檔案類型'), 'required' => false,
             ),
             'sort' => array(
-                'label' => '排序', 'required' => false,
+                'label' => __('排序'), 'required' => false,
                 'callbacks' => array('intval')
             ),
         );
@@ -59,7 +59,7 @@ abstract class Attachment extends Model
     {
         return array(
             'file' => array(
-                'label' => '檔案', 'required' => true,
+                'label' => __('檔案'), 'required' => true,
                 'dir' => ROOT_PATH . $this->_config['uploadDir'],
                 'fileKey' => $key,
                 'type' => 'file',

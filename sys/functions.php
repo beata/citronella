@@ -101,6 +101,9 @@ function HtmlClean($value)
         $config->set('HTML.Trusted', true);
         $config->set('HTML.FlashAllowFullScreen', true);
 
+        $config->set('HTML.SafeIframe', true);
+        $config->set('URI.SafeIframeRegexp', '%^http://(www.youtube(?:-nocookie)?.com/embed/|player.vimeo.com/video/)%'); //allow YouTube and Vimeo
+
         $config->set('Attr.EnableID', true);
         $config->set('Attr.AllowedFrameTargets', array('_blank'));
 
@@ -195,38 +198,6 @@ function currencyTW($number, $sign='NT$')
 {
     return $sign . number_format($number);
 }
-function dateTW($date, $text=FALSE)
-{
-    $timeTW = strtotime($date);
-
-    $year = (int)date('Y', $timeTW) - 1911;
-
-    if ( FALSE === $text) {
-        return $year . date('/m/d', $timeTW);
-    }
-    $era = 'era' === $text ? '民國' : '';
-    return $era . $year . '年' . date('m', $timeTW) . '月' . date('d', $timeTW) . '日';
-}
-
-function datetimeTW($timeString, $text=FALSE, $time_format='H:i:s')
-{
-    if ( ! $timeString) {
-        return '';
-    }
-    $time = strtotime($timeString);
-    if ( FALSE === $text ) {
-        $time = ' ' . date($time_format, $time);
-    } else {
-        if ( FALSE === strpos($time_format, ':s')) {
-            $time_format = 'h點i分';
-        } else {
-            $time_format = 'h點i分s秒';
-        }
-        $time = (date('A', $time) === 'AM' ? '上午' : '下午') . date($time_format, $time);
-    }
-
-    return dateTW($timeString, $text) . $time;
-}
 // System View Functions
 /**
  * 顯示 session 訊息
@@ -288,8 +259,8 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
     $input_attrs = $attrs;
     foreach ( $array as $value => $label)
     {
-        if ( is_array($attrs) && isset($attrs[$value])) {
-            $input_attrs = $attrs[$value];
+        if ( is_array($attrs) ) {
+            $input_attrs = isset($attrs[$value]) ? $attrs[$value] : '';
         }
         $i++;
         $value_enc = HtmlValueEncode($value);
@@ -378,7 +349,7 @@ function show_actions($actions, $default=NULL, $class='input-medium')
         return;
     }
 
-    echo '選擇的項目: <select class="' . $class . '" name="action" id="selActions">';
+    echo _e('選擇的項目'), ': <select class="' . $class . '" name="action" id="selActions">';
     foreach ( $actions as $action => $info) {
         echo '<option value="'.$action.'"';
         if ( $action === $default) {
@@ -400,6 +371,9 @@ function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
 
     if ( ! $linkCurrent ) {
         $current = array_pop($path);
+        if (is_array($current)) {
+            $current = $current['name'];
+        }
     }
 
     echo '<ul class="breadcrumb margin-bottom">';
@@ -428,13 +402,13 @@ function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
     }
     echo '</ul>';
 }
-function search_input($searchby, $unsets=array())
+function search_input($searchby, $unsets=array(), $inputClass=array('by' => 'input-medium', 'query' => 'input-medium'))
 {
     $urls = App::urls();
 ?>
   <?php if (count($searchby) > 1): ?>
-  <select class="input-medium" name="by">
-    <option value="">搜尋欄位</option>
+  <select class="<?php echo $inputClass['by'] ?>" name="by">
+  <option value=""><?php echo _e('搜尋欄位') ?></option>
     <?php html_options($searchby, (isset($_GET['by']) ? $_GET['by'] : null)); ?>
   </select>
   <?php else: ?>
@@ -442,7 +416,7 @@ function search_input($searchby, $unsets=array())
   <?php endif; ?>
 
   <div class="input-append">
-      <input class="search-query input-medium" type="search" name="keyword" placeholder="Search..." value="<?php if ( isset($_GET['keyword'])): echo HtmlValueEncode($_GET['keyword']); endif; ?>" /><button type="submit" class="btn btn-success">搜尋</button>
+      <input class="search-query <?php echo $inputClass['query'] ?>" type="search" name="keyword" placeholder="<?php echo (count($searchby) > 1 ? 'Search...' : HtmlValueEncode(current($searchby))) ?>" value="<?php if ( isset($_GET['keyword'])): echo HtmlValueEncode($_GET['keyword']); endif; ?>" /><button type="submit" class="btn btn-success"><?php echo _e('搜尋') ?></button>
   </div>
 <?php
   $unsets[] = 'by';

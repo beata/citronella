@@ -1,5 +1,13 @@
 <?php
-class NotFoundException extends Exception {}
+class NotFoundException extends Exception {
+    public function __construct($message='', $code=0, Exception $previous=NULL)
+    {
+        if ( !$message) {
+            $message = __('頁面不存在');
+        }
+        parent::__construct($message, $code, $previous);
+    }
+}
 
 class App
 {
@@ -92,14 +100,14 @@ class App
             $action = $controller->defaultAction;
         }
 
-        if ( method_exists($controller, 'preAction')) {
-            $controller->preAction();
+        if ( method_exists($controller, '_preAction')) {
+            $controller->_preAction();
         }
 
         $controller->{$action}();
 
-        if ( method_exists($controller, 'postAction')) {
-            $controller->postAction();
+        if ( method_exists($controller, '_postAction')) {
+            $controller->_postAction();
         }
     }
 
@@ -167,6 +175,15 @@ class App
         return new View($appId ? $appId : self::$id);
     }
 
+    public static function i18n($config=array())
+    {
+        static $i18n = NULL;
+        if ($i18n === NULL) {
+            $i18n = new I18N($config);
+        }
+        return $i18n;
+    }
+
     public static function loadHelper($class, $createObj=false, $appId=NULL)
     {
         require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/helpers/' . $class . '.php';
@@ -206,14 +223,15 @@ abstract class Controller
             'baseUrl' => $this->_baseUrl
         ));
     }
-    public function _show404($backLink=false, $layout='layout')
+    public function _show404($backLink=false, $content=NULL, $layout='layout')
     {
         if ( FALSE === $_SERVER['IS_IIS'] ) {
             header('HTTP/1.0 404 Not Found', true, 404);
             header('Status: 404');
         }
         $this->data['page_title'] = $this->data['window_title'] = _e('404 頁面不存在!');
-        $this->_showError(_e('您所要檢視的頁面不存在！'), $backLink, $layout);
+        $content = (NULL === $content ? _e('您所要檢視的頁面不存在！') : $content);
+        $this->_showError($content, $backLink, $layout);
     }
     public function _showError($content, $backLink=true, $layout='layout')
     {
@@ -252,6 +270,8 @@ abstract class Controller
 } // END class
 abstract class BaseController extends Controller
 {
+    public $_apiSendFailHeader = FALSE;
+
     public function api($segment=2, $module=NULL)
     {
         try {
@@ -265,6 +285,9 @@ abstract class BaseController extends Controller
             }
             $response = $obj->{$method}();
         } catch ( Exception $ex ) {
+            if ( $this->_apiSendFailHeader) {
+                header('HTTP/1.1 400 Bad Request');
+            }
             $response = array( 'error' => array( 'message' => $ex->getMessage() ) );
         }
         header('Content-Type: text/plain; charset="' . App::conf()->encoding . '"');
@@ -306,6 +329,8 @@ abstract class Module
 }
 abstract class Model
 {
+    protected $_customId = FALSE;
+
     protected $_config = array(
         'primaryKey' => 'id',
         'table' => null
@@ -338,7 +363,7 @@ abstract class Model
             $this->beforeSave($fields, $input, $args);
         }
 
-        if ( ! $this->hasPrimaryKey()) {
+        if ( $this->_customId || ! $this->hasPrimaryKey()) {
             $this->insert(array_keys($fields));
         } else {
             $this->update(array_keys($fields));
@@ -449,6 +474,53 @@ abstract class Model
             $this->_config[$key] = $value;
         }
     }
+
+    // select relational
+    public static function selectBelongsTo(&$select, $config, $columns='name')
+    {
+        foreach ( $config as $alias => $rconf) {
+            if ( is_string($columns)) {
+                $select[] = '(SELECT `' . $columns . '` FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $columns . '`';
+                continue;
+            }
+            if ( is_array($columns)) {
+                if ( isset($columns[$alias])) {
+                    if ( is_string($columns[$alias])) { // select field
+                        $select[] = '(SELECT `' . $columns[$alias] . '` FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $columns[$alias] . '`';
+                        continue;
+                    }
+                    if ( is_array($columns[$alias])) { // complex query
+                        foreach ($columns[$alias] as $columnsName => $rawSelect ) {
+                            if ( is_numeric($columnsName)) {
+                                $columnsName = $rawSelect;
+                            }
+                            $select[] = '(SELECT ' . $rawSelect . ' FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $columnsName . '`';
+                        }
+                        continue;
+                    }
+                }
+                continue;
+            }
+        }
+    }
+
+    public static function selectHasMany(&$select, $config, $columns=array())
+    {
+        foreach ($config as $alias => $rconf) {
+            $fromWhere = ' FROM `' . $rconf['table'] . '` b WHERE '
+                . (isset($rconf['whereLink']) ? $rconf['whereLink'] : 'b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`')
+                . (isset($rconf['where']) ? ' AND ' . $rconf['where'] : '');
+            $select[] = '(SELECT COUNT(*) ' . $fromWhere . ') `' . $alias . '_count`';
+
+            if ( isset($columns[$alias])) {
+                foreach ($columns[$alias] as $columnsName => $rawSelect ) {
+                    $select[] = '(SELECT ' . $rawSelect . ' ' . $fromWhere . ') `' . $alias . '_' . $columnsName . '`';
+                }
+            }
+        }
+    }
+
+
 }
 abstract class ViewModel
 {
@@ -458,7 +530,13 @@ abstract class ViewModel
     public function __construct($model, $baseUrl=NULL)
     {
         $this->m = $model;
-        $this->baseUrl = $baseUrl;
+        if (is_array($baseUrl)) {
+            foreach ($baseUrl as $key => $value) {
+                $this->{$key} = $value;
+            }
+        } else {
+            $this->baseUrl = $baseUrl;
+        }
     }
 }
 class View
@@ -727,6 +805,14 @@ class DBHelper
     }
     public static function deleteColumnFile($options)
     {
+        /* Options
+         * columns  array
+         * table    string
+         * where    string
+         * dir      string
+         * params   array optional
+         * suffixes string optional
+         */
         extract($options);
 
 
@@ -802,6 +888,7 @@ class DBHelper
         $mconf = $model->getConfig();
 
         if ( is_object($ids) && is_a($ids, 'Search')) {
+            $search = $ids;
             $where = $search->sqlWhere();
             $stmt = App::db()->prepare('DELETE FROM `' . $mconf['table'] . '` ' . $where);
             $stmt->execute($search->params);
@@ -848,12 +935,12 @@ class DBHelper
         $pagerInfo = null;
 
         if ( NULL !== $pager) {
-           $pagerInfo = $pager->getSqlGroupBy() . ' ORDER BY `' . $pager->sortField . '` ' . $pager->sortDir . $pager->getSqlLimit();
+            $pagerInfo = $pager->getSqlGroupBy() . $pager->getSqlOrderBy() . $pager->getSqlLimit();
         } elseif (isset($mconf['primaryKey'])) {
             $pagerInfo = ' ORDER BY `' . $mconf['primaryKey'] . '` ASC';
         }
 
-        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
         $stmt->execute($params);
         return $stmt;
     }
@@ -866,7 +953,7 @@ class DBHelper
         $model = new $model;
         $mconf = $model->getConfig();
 
-        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for) . ' FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
         $stmt->execute($params);
 
         if ( NULL !== $fetchIntoObject ) {
@@ -907,6 +994,7 @@ class DBHelper
         }
         return compact('where', 'params');
     }
+
 } // END class
 class Validator
 {
@@ -963,6 +1051,8 @@ class Validator
                     _e('%s: 圖片上傳失敗，請稍後再上傳一次'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>'));
         }
+        $data->_new_files[] = $opt['dir'] . $source;
+
         if ( $data->{$key}) { // 移除舊檔案
             $file = $gd->processPath . $data->{$key};
             if (file_exists($file)) {
@@ -983,31 +1073,24 @@ class Validator
         $info = pathinfo($source);
         $filename = $info['filename'];
         $ext = strtolower($info['extension']);
-        if (
-            $gd->{$method}(
-                $source,
-                $opt['resize'][0], $opt['resize'][1],
-                $filename,
-                (isset($opt['cropFrom']) ? $opt['cropFrom'] : null)
-            )
-        ) {
-            $data->{$key} = $input[$key] = $source;
-            $data->_new_files[] = $opt['dir'] . $source;
-        }
+        $gd->{$method}(
+            $source,
+            $opt['resize'][0], $opt['resize'][1],
+            $filename,
+            (isset($opt['cropFrom']) ? $opt['cropFrom'] : null)
+        );
+        $data->{$key} = $input[$key] = $source;
 
         if ( isset($opt['thumbnails'])) {
             foreach ( $opt['thumbnails'] as $suffix => $sOpt) {
                 $method = empty($sOpt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
-                if (
-                    $gd->{$method}(
-                        $source,
-                        $sOpt['size'][0], $sOpt['size'][1],
-                        $filename . $suffix,
-                        (isset($sOpt['cropFrom']) ? $sOpt['cropFrom'] : null)
-                    )
-                ) {
-                    $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $ext;
-                }
+                $gd->{$method}(
+                    $source,
+                    $sOpt['size'][0], $sOpt['size'][1],
+                    $filename . $suffix,
+                    (isset($sOpt['cropFrom']) ? $sOpt['cropFrom'] : null)
+                );
+                $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $ext;
             }
         }
     }
@@ -1045,7 +1128,7 @@ class Validator
             $oldFile = $data->{$key};
             $newFile = $uploader->save();
 
-            if ( $oldFile ) { // 移除舊檔案
+            if ( $oldFile && file_exists($opt['dir'] . $oldFile)) { // remove old file
                 unlink($opt['dir'] . $oldFile);
             }
             $data->{$key} = $input[$key] = $newFile;
@@ -1261,7 +1344,7 @@ class Validator
         }
 
         if (!preg_match($pattern, $value)) {
-            throw new Exception( sprintf('日期格式不正確!請使用%s格式', $format));
+            throw new Exception( sprintf(__('日期格式不正確!請使用%s格式'), $format));
         }
         return $value;
     }
@@ -1270,7 +1353,7 @@ class Validator
         $rs = strtotime($value);
 
         if ($rs===false || $rs===-1){
-            throw new Exception('時間格式不正確');
+            throw new Exception(__('時間格式不正確'));
         }
         return $value;
     }
@@ -1278,7 +1361,7 @@ class Validator
     public static function idNumber($value, $identityType='id')
     {
         if ( ! self::_idNumber($value, $identityType)) {
-            throw new Exception('請輸入有效的證件編號');
+            throw new Exception(__('請輸入有效的證件編號'));
         }
         return $value;
     }
@@ -1356,7 +1439,7 @@ class Validator
         }
 
         if ( ! DBHelper::count($model, $search) ) {
-            throw new Exception('資料不存在');
+            throw new Exception(__('資料不存在'));
         }
         return $value;
     }
@@ -1799,8 +1882,53 @@ class Acl
 
 } // END class
 
+class I18N
+{
+    public $translation;
+
+    public function __construct($config=array())
+    {
+        $config = array_merge(array(
+            'locale'  => 'zh_TW.UTF8',
+            'encoding'  => 'UTF-8',
+            'folder'    => 'locales' . DIRECTORY_SEPARATOR,
+            'domain'    => 'default',
+        ), $config);
+
+        App::loadHelper('pomo' . DIRECTORY_SEPARATOR . 'po', false, 'common');
+
+        $this->loadTextDomain($config);
+    }
+    public function loadTextDomain($config)
+    {
+        $this->config = $config;
+
+        $pofile = $config['folder'] . $config['domain'] . '.' . $config['locale'] . '.po';
+        if ( ! is_readable($pofile)) {
+            $this->translation = new NOOP_Translations;
+            return false;
+        }
+        $po = new PO();
+        if ( ! $po->import_from_file($pofile)) {
+            $this->translation = new NOOP_Translations;
+            return false;
+        }
+        $this->translation = $po;
+        return true;
+    }
+
+    public function getLocalName($withEncoding=TRUE)
+    {
+        if ($withEncoding) {
+            return $this->config['locale'];
+        }
+        return current(explode('.', $this->config['locale']));
+    }
+} // END class
+
+
 function __($message) {
-    return $message;
+    return App::i18n()->translation->translate($message);
 }
 /**
  * 單數、複數訊息

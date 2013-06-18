@@ -14,12 +14,12 @@ class Configuration extends Model
 
     protected $_config = array(
         'primaryKey' => 'id',
-        'table' => 'configurations',
-        'uploadDir' => 'uploads/configurations/',
+        'table' => 'configuration',
+        'uploadDir' => 'uploads/configuration/',
 
         'groups' => array(
             'basic' => array(
-                'key' => 1, 'name' => '基本設定'),
+                'key' => 1, 'name' => NULL /* name would be set later in the __construct() */ ),
         ),
 
         'inputTypes' => array(
@@ -34,13 +34,19 @@ class Configuration extends Model
             32 => 'html',
         ),
 
-        'inputLabels' => array(
-            'site_name' => '網站名稱',
-            'system_email' => '系統信箱',
-            'service_email' => '服務信箱',
-            'footer' => '頁腳文字',
-        )
+        'inputLabels' => NULL, // would be set later in the __construct()
     );
+
+    public function __construct()
+    {
+        $this->_config['groups']['basic']['name'] = __('基本設定');
+        $this->_config['inputLabels'] = array(
+            'site_name' => __('網站名稱'),
+            'system_email' => __('系統信箱'),
+            'service_email' => __('服務信箱'),
+            'footer' => __('頁腳文字'),
+        );
+    }
 
     public function fields($for='manage')
     {
