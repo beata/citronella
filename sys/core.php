@@ -5,7 +5,11 @@ class NotFoundException extends Exception {
         if ( !$message) {
             $message = __('頁面不存在');
         }
-        parent::__construct($message, $code, $previous);
+        if (NULL === $previous) {
+            parent::__construct($message, $code);
+        } else {
+            parent::__construct($message, $code, $previous);
+        }
     }
 }
 
@@ -237,7 +241,7 @@ abstract class Controller
     {
         if ( $backLink ) {
             $content = '<div>' . $content . '</div>'
-                . '<div class="alert-actions"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
+                . '<div class="alert-actions margin-top"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
         }
         $this->data['content'] = $content;
         $this->_prepareLayout();
@@ -364,6 +368,13 @@ abstract class Model
         }
 
         if ( $this->_customId || ! $this->hasPrimaryKey()) {
+            if ( is_array($this->_config['primaryKey'])) {
+                foreach ( $this->_config['primaryKey'] as $key) {
+                    if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
+                        $fields[$key] = true;
+                    }
+                }
+            }
             $this->insert(array_keys($fields));
         } else {
             $this->update(array_keys($fields));
@@ -376,14 +387,6 @@ abstract class Model
     public function insert($fields)
     {
         $db = App::db();
-
-        if ( is_array($this->_config['primaryKey'])) {
-            foreach ( $this->_config['primaryKey'] as $key) {
-                if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
-                    $fields[$key] = true;
-                }
-            }
-        }
 
         $params = array();
         if ( isset($this->rawValueFields)) {
@@ -857,7 +860,7 @@ class DBHelper
         if ( is_array($str)) {
             return $str;
         }
-        if ( empty($str)) {
+        if ( NULL === $str || '' === $str) {
             return array();
         }
         $array = explode(',', $str);
@@ -887,7 +890,7 @@ class DBHelper
         $model = new $model;
         $mconf = $model->getConfig();
 
-        if ( is_object($ids) && is_a($ids, 'Search')) {
+        if ( is_object($ids) && $ids instanceof Search ) {
             $search = $ids;
             $where = $search->sqlWhere();
             $stmt = App::db()->prepare('DELETE FROM `' . $mconf['table'] . '` ' . $where);
@@ -911,7 +914,7 @@ class DBHelper
         $stmt->execute($params);
     }
 
-    public static function count($model, $search)
+    public static function count($model, $search, $countWith='*')
     {
         $where = $params = NULL;
         extract(self::translateModelSearchArg($model, $search));
@@ -919,7 +922,7 @@ class DBHelper
         $model = new $model;
         $mconf = $model->getConfig();
 
-        $stmt = App::db()->prepare('SELECT COUNT(*) FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $stmt = App::db()->prepare('SELECT COUNT(' . $countWith . ') `counts` FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
         $stmt->execute($params);
         return $stmt->fetchColumn();
     }
@@ -936,8 +939,16 @@ class DBHelper
 
         if ( NULL !== $pager) {
             $pagerInfo = $pager->getSqlGroupBy() . $pager->getSqlOrderBy() . $pager->getSqlLimit();
-        } elseif (isset($mconf['primaryKey'])) {
-            $pagerInfo = ' ORDER BY `' . $mconf['primaryKey'] . '` ASC';
+        } else {
+            $pagerInfo = '';
+            if (!empty($search->groupBy)) {
+                $pagerInfo .= ' GROUP BY ' . $search->groupBy;
+            }
+            if (!empty($search->orderBy)) {
+                $pagerInfo .= ' ORDER BY ' . $search->orderBy;
+            } elseif (isset($mconf['primaryKey'])) {
+                $pagerInfo .= ' ORDER BY `' . $mconf['primaryKey'] . '` ASC';
+            }
         }
 
         $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
@@ -953,7 +964,17 @@ class DBHelper
         $model = new $model;
         $mconf = $model->getConfig();
 
-        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $searchInfo = NULL;
+        if ( is_object($search) && $search instanceof Search ) {
+            if (!empty($search->groupBy)) {
+                $searchInfo .= ' GROUP BY ' . $search->groupBy;
+            }
+            if (!empty($search->orderBy)) {
+                $searchInfo .= ' ORDER BY ' . $search->orderBy;
+            }
+        }
+
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $searchInfo . ' LIMIT 1');
         $stmt->execute($params);
 
         if ( NULL !== $fetchIntoObject ) {
@@ -1477,6 +1498,12 @@ class Urls
      * @var string
      **/
     private $_queryStringPrefix;
+    /**
+     * 產生連結時的檔案名稱 eg: index.php or keep it blank to use server default setting.
+     *
+     * @var string
+     **/
+    private $_indexFile;
 
 
     /**
@@ -1495,9 +1522,26 @@ class Urls
         $this->_queryString = isset($_GET[$this->_paramName]) ? trim($_GET[$this->_paramName], '/') : '';
         $this->_segments = explode('/', $this->_queryString);
     }
+    public function setIndexFile($file)
+    {
+        $this->_indexFile = $file;
+    }
     public function setQueryStringPrefix($prefix)
     {
         $this->_queryStringPrefix = $prefix;
+    }
+    public function getQueryStringPrefix($prefix)
+    {
+        return $this->_queryStringPrefix;
+    }
+    public function getSegments()
+    {
+        return $this->_segments;
+    }
+
+    public function shiftSegments()
+    {
+        array_shift($this->_segments);
     }
     /**
      * 偵測伺服器是否有啟用 mod rewrite
@@ -1611,7 +1655,7 @@ class Urls
             $url = http_build_query($params, '', $argSeparator);
             if ( $url ) {
                 $url = str_replace('%2F', '/', $url);
-                $url = $this->_urlBase . '?' . $url;
+                $url = $this->_urlBase . $this->_indexFile . '?' . $url;
             } else {
                 $url = $this->_urlBase;
             }
@@ -1716,7 +1760,8 @@ class Route
     }
     public function parse()
     {
-        $queryString = App::urls()->getQueryString();
+        $urls = App::urls();
+        $queryString = implode('/', $urls->getSegments());
         foreach ($this->_routes as $pattern => $config) {
             if ( !preg_match('#^' . $pattern . '#', $queryString, $matches)) {
                 continue;
@@ -1797,6 +1842,7 @@ class Acl
         $defaultRule = !isset($this->_rules['__default']) ? array() : $this->_rules['__default'];
         $rule = $this->_rules[$role];
 
+        // key 越後面的規則優先
         foreach ($rule as $key => $value) {
             if ( isset($defaultRule[$key])) {
                 unset($defaultRule[$key]);
@@ -1928,7 +1974,7 @@ class I18N
 
 
 function __($message) {
-    return App::i18n()->translation->translate($message);
+    return $message;
 }
 /**
  * 單數、複數訊息
