@@ -102,7 +102,7 @@ function HtmlClean($value)
         $config->set('HTML.FlashAllowFullScreen', true);
 
         $config->set('HTML.SafeIframe', true);
-        $config->set('URI.SafeIframeRegexp', '%^http://(www.youtube(?:-nocookie)?.com/embed/|player.vimeo.com/video/)%'); //allow YouTube and Vimeo
+        $config->set('URI.SafeIframeRegexp', '%^(http:)?//(www.youtube(?:-nocookie)?.com/embed/|player.vimeo.com/video/)%'); //allow YouTube and Vimeo
 
         $config->set('Attr.EnableID', true);
         $config->set('Attr.AllowedFrameTargets', array('_blank'));
