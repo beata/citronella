@@ -8,6 +8,7 @@
 
 if ( phpversion() < 5.3) {
     require_once dirname(__FILE__) . '/../sys/to_php53.php';
+    require_once dirname(__FILE__) . '/../sys/upgradephp-18.1/upgrade.php';
 }
 
 $config = array(
