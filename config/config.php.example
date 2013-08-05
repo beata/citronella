@@ -1,7 +1,8 @@
 <?php
-// Development value
+// Development settings
 // error_reporting(E_ALL | E_STRICT);
-// Production value
+// ini_set('html_errors', 1);
+// Production settings
 // error_reporting(E_ALL & ~E_DEPRECATED);
 
 if ( phpversion() < 5.3) {
