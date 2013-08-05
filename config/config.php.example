@@ -2,6 +2,7 @@
 // Development settings
 // error_reporting(E_ALL | E_STRICT);
 // ini_set('html_errors', 1);
+
 // Production settings
 // error_reporting(E_ALL & ~E_DEPRECATED);
 
@@ -41,6 +42,12 @@ $config = array(
             'last' => '<i class="icon-fast-forward"></i>',
         )
     ),
+
+    // Google 分析追蹤
+    'ga' => array(
+        'account' => '',    // 追蹤編號
+        'domain' => ''      // 網域(optional)
+    )
 );
 
 define('ROOT_PATH', dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR);

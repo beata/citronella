@@ -1,4 +1,19 @@
 <?php
+// Array Helper
+function array_get_value(&$array, $firstKey=NULL, $secondKey=NULL)
+{
+    if (NULL === $firstKey) {
+        return $array;
+    }
+    if (!isset($array[$firstKey])) {
+        return NULL;
+    }
+    $item = $array[$firstKey];
+    if (NULL === $secondKey) {
+        return $item;
+    }
+    return (isset($item[$secondKey]) ? $item[$secondKey] : NULL);
+}
 // HTTP Functions
 function is_ssl()
 {
@@ -425,3 +440,26 @@ function search_input($searchby, $unsets=array(), $inputClass=array('by' => 'inp
 } // search_form
 
 // App View Functions
+function google_analytics($gaSettings)
+{
+    if (empty($gaSettings->account)) {
+        return;
+    }
+?>
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', '<?php echo HtmlValueEncode($gaSettings->account) ?>']);
+<?php if (!empty($gaSettings->domain)): ?>
+  _gaq.push(['_setDomainName', '<?php echo HtmlValueEncode($gaSettings->domain) ?>']);
+<?php endif; ?>
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+</script>
+<?php
+}

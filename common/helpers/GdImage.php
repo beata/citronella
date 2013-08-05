@@ -846,17 +846,16 @@ class GdImage {
                 $newName = $basename;
             }
 
-            if($rename=='')
-                $imgPath = $this->uploadPath . $newName;
-            else
-                $imgPath = $this->uploadPath . $rename . $ext;
+            $filename = (($rename=='') ? $newName : $rename . $ext);
+            $imgPath = $this->uploadPath . $filename;
 
             if (move_uploaded_file($img['tmp_name'], $imgPath)){
-                return ($rename=='') ? $newName : $rename . $ext;
+                $this->fixOrientation($imgPath);
+                return $filename;
             }
         }
         else{
-            $uploadImagesPath = array();
+            $uploadedImages = array();
             foreach($img['error'] as $k=>$error){
                 if(empty($img['name'][$k])) continue;
                 if ($error == UPLOAD_ERR_OK) {
@@ -871,19 +870,18 @@ class GdImage {
                        $newName = $basename;
                    }
 
-                   if($rename=='')
-                       $imgPath = $this->uploadPath . $newName;
-                   else
-                       $imgPath = $this->uploadPath . $rename . '_' . $k . $ext;
+                   $filename = ('' == $rename ? $newName : $rename . '_' . $k . $ext);
+                   $imgPath = $this->uploadPath . $filename;
 
                    if (move_uploaded_file($img['tmp_name'][$k], $imgPath)){
-                       $uploadImagesPath[] = $newName;
+                       $this->fixOrientation($imgPath);
+                       $uploadedImages[] = $filename;
                    }
                 }else{
                    return false;
                 }
             }
-            return $uploadImagesPath;
+            return $uploadedImages;
         }
     }
 
@@ -983,4 +981,36 @@ class GdImage {
         }
     }
 
+    public function fixOrientation($filepath)
+    {
+        $exif = exif_read_data($filepath);
+        if (empty($exif['Orientation'])) {
+            return $filepath;
+        }
+
+        $imginfo = $this->getInfo($filepath);
+        $this->createImageObject($img, $imginfo['type'], $filepath);
+        if (!$img) return false;
+
+        switch ($exif['Orientation']) {
+            case 3:
+                $img = imagerotate($img, 180, 0);
+                break;
+
+            case 6:
+                $img = imagerotate($img, -90, 0);
+                break;
+
+            case 8:
+                $img = imagerotate($img, 90, 0);
+                break;
+        }
+
+        if ($filepath) {
+            unlink($filepath);
+        }
+        $this->generateImage($img, $filepath);
+        imagedestroy($img);
+        return $filepath;
+    }
 }

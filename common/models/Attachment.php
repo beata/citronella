@@ -123,7 +123,11 @@ abstract class Attachment extends Model
                     $fields['mime'] = true;
                     $m->mime = $m->file_type;
                     if ( !$m->name ) {
-                        $m->name = pathinfo($m->file_orignal_name, PATHINFO_FILENAME);
+                        $info = pathinfo($m->file_orignal_name);
+                        if ( !isset($info['filename'])) {
+                            $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
+                        }
+                        $m->name = $info['filename'];
                     }
                 }
                 $this->_new_files = array_merge($this->_new_files, $m->_new_files);

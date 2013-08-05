@@ -239,6 +239,11 @@ abstract class Controller
     }
     public function _showError($content, $backLink=true, $layout='layout')
     {
+        if ($_REQUEST['is_ajax']) {
+            $layout = false;
+            $backLink = false;
+        }
+
         if ( $backLink ) {
             $content = '<div>' . $content . '</div>'
                 . '<div class="alert-actions margin-top"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
@@ -840,9 +845,12 @@ class DBHelper
                 }
                 if ( isset($options['suffixes'][$column])) {
                     $info = pathinfo($item->{$column});
+                    if ( !isset($info['filename'])) {
+                        $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
+                    }
                     $fdir = '';
                     if ( '.' !== $info['dirname']) {
-                        $fdir = $info['dirname'] . DIRECTORY_SEPARATOR . $filename;
+                        $fdir = $info['dirname'] . DIRECTORY_SEPARATOR;
                     }
                     foreach ($options['suffixes'][$column] as $suffix) {
                         $filename = $fdir . $info['filename'] . $suffix . '.' . $info['extension'];
@@ -949,6 +957,9 @@ class DBHelper
             } elseif (isset($mconf['primaryKey'])) {
                 $pagerInfo .= ' ORDER BY `' . $mconf['primaryKey'] . '` ASC';
             }
+            if (!empty($search->limit)) {
+                $pagerInfo .= ' LIMIT ' . $search->limit;
+            }
         }
 
         $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
@@ -1022,6 +1033,15 @@ class Validator
     /**
      * 儲存圖片，若為圖片更新則會刪除舊圖片之後再存新圖
      *
+     * $opt
+     *  [resize] (array)
+     *  [crop] (bool)
+     *  [thumbnails] (array)
+     *      [{suffix}] (array)
+     *          [size] (array)
+     *          [crop] (bool)
+     *
+     *
      * @return void
      * @author Me
      */
@@ -1081,6 +1101,9 @@ class Validator
             }
             if ( isset($opt['thumbnails'])) {
                 $oldinfo = pathinfo($data->{$key});
+                if ( !isset($oldinfo['filename'])) {
+                    $oldinfo['filename'] = substr($oldinfo['basename'], 0, strlen($oldinfo['basename'])-strlen($oldinfo['extension'])-1);
+                }
                 foreach ($opt['thumbnails'] as $suffix => $sOpt)  {
                     $file = $gd->processPath . $oldinfo['dirname'] . DIRECTORY_SEPARATOR . $oldinfo['filename'] . $suffix . '.' . $oldinfo['extension'];
                     if ( file_exists($file)) {
@@ -1090,8 +1113,15 @@ class Validator
             }
             $data->{$key} = $input[$key] = '';
         }
-        $method = empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
+        if (!isset($opt['method'])) {
+            $method = empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
+        } else {
+            $method = $opt['method'];
+        }
         $info = pathinfo($source);
+        if ( !isset($info['filename'])) {
+            $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
+        }
         $filename = $info['filename'];
         $ext = strtolower($info['extension']);
         $gd->{$method}(
@@ -1104,7 +1134,11 @@ class Validator
 
         if ( isset($opt['thumbnails'])) {
             foreach ( $opt['thumbnails'] as $suffix => $sOpt) {
-                $method = empty($sOpt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
+                if (!isset($sOpt['method'])) {
+                    $method = empty($sOpt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
+                } else {
+                    $method = $sOpt['method'];
+                }
                 $gd->{$method}(
                     $source,
                     $sOpt['size'][0], $sOpt['size'][1],

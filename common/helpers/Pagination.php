@@ -6,7 +6,10 @@
  *
  * 讀與寫
  *  totalRows   - 總筆數
+ *
  *  param       - 網址分頁 $_GET 參數名稱
+ *  segment     - 網址分頁參數位置（與param則一使用)
+ *
  *  paramSort   - 網址排序 $_GET 參數名稱
  *  sortField   - 排序欄位
  *  sortDir     - 排序方向
@@ -23,7 +26,10 @@
 class Pagination
 {
     public $totalRows = 0;
+
     public $param = 'page';
+    public $segment = NULL;
+
     public $paramSort = 'sort';
     public $sortField = 'id';
     public $sortDir = 'asc';
@@ -97,7 +103,13 @@ class Pagination
         // paginate
         $this->totalPages = $this->rowsPerPage ? ceil($this->totalRows / $this->rowsPerPage) : 1;
 
-        $pageNum = isset($_GET[$this->param]) ? $_GET[$this->param] : 1;
+        if (NULL === $this->segment) {
+            $pageNum = isset($_GET[$this->param]) ? $_GET[$this->param] : 1;
+        } else {
+            if (!($pageNum = (int)App::urls()->segment($this->segment))) {
+                $pageNum = 1;
+            }
+        }
         $this->setCurrentPage($pageNum);
 
         $this->_origDir = $this->sortDir;
@@ -199,7 +211,7 @@ class Pagination
 
         // first page
         if ( $this->currentPage != 1) {
-            $_url = $url . '1';
+            $_url = $this->__pageUrl(1);
             $class = '';
         } else {
             extract($disabled);
@@ -208,7 +220,7 @@ class Pagination
 
         // previous page
         if ( $this->currentPage > 1) {
-            $_url = $url . ($this->currentPage-1);
+            $_url = $this->__pageUrl(($this->currentPage-1));
             $class = '';
         } else {
             extract($disabled);
@@ -220,12 +232,12 @@ class Pagination
             foreach ( range($numStart, $numEnd) as $num):
                 echo '<li',
                     ( $num == $this->currentPage ? ' class="active"' : '' ),
-                    '><a class="visible-desktop" href="', $url, $num, '">', $num, '</a></li>';
+                    '><a class="visible-desktop" href="', $this->__pageUrl($num), '">', $num, '</a></li>';
             endforeach;
         }
 
         if ( $this->showJumper) {
-            echo '<li><span class="hidden-desktop"><select class="pagination-jumper" data-go-selected="', $url, '">';
+            echo '<li><span class="hidden-desktop"><select class="pagination-jumper" data-go-selected="', $this->__pageUrl('_-pageNum-_'), '">';
             foreach ( range($numStart, $numEnd) as $num):
                 echo '<option value="', $num, '"',
                     ( $num == $this->currentPage ? ' selected="selected"' : '' ),
@@ -236,7 +248,7 @@ class Pagination
 
         // next page
         if ( $this->currentPage < $this->totalPages ) {
-            $_url =  $url . ($this->currentPage+1);
+            $_url =  $this->__pageUrl(($this->currentPage+1));
             $class = '';
         } else {
             extract($disabled);
@@ -245,7 +257,7 @@ class Pagination
 
         // last page
         if ( $this->currentPage != $this->totalPages ) {
-            $_url =  $url . $this->totalPages;
+            $_url =  $this->__pageUrl($this->totalPages);
             $class = '';
         } else {
             extract($disabled);
@@ -259,6 +271,24 @@ class Pagination
         }
 
         echo '</div>';
+    }
+    private function __pageUrl($pageNum)
+    {
+        if (NULL === $this->segment) {
+            $params = $_GET;
+            unset($params[$this->param]);
+            $urlparams = http_build_query($params, '', '&amp;');
+            $url = $urlparams
+                ? '?' . $urlparams . '&amp;' . $this->param . '='
+                : '?' . $this->param . '=';
+
+            return $url . $pageNum;
+        }
+
+        $urls = App::urls();
+        $segments = $urls->allSegments();
+        $segments[$this->segment] = $pageNum;
+        return $urls->urlto(implode('/', $segments));
     }
     public function sortLink($fieldName, $displayName, $attrs=NULL, $symbalAsc=NULL, $symbalDesc=NULL)
     {
