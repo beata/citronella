@@ -29,7 +29,7 @@ class Upload
             $this->checkError( $_FILES[$this->fieldName]['error']);
             $this->checkSize( $_FILES[$this->fieldName]['size']);
 
-            $ext = pathinfo($_FILES[$this->fieldName]['name'], PATHINFO_EXTENSION);
+            $ext = pathinfo(strtolower($_FILES[$this->fieldName]['name']), PATHINFO_EXTENSION);
             if ( !empty($this->denyFiles)) {
                 $this->checkExtension( $ext );
             }
@@ -42,7 +42,7 @@ class Upload
 		$this->checkError( $_FILES[$this->fieldName]['error'][$idx]);
 		$this->checkSize( $_FILES[$this->fieldName]['size'][$idx]);
 
-        $ext = pathinfo($_FILES[$this->fieldName]['name'][$idx], PATHINFO_EXTENSION);
+        $ext = pathinfo(strtolower($_FILES[$this->fieldName]['name'][$idx]), PATHINFO_EXTENSION);
         if ( !empty($this->denyFiles)) {
             $this->checkExtension( $ext );
         }
@@ -65,7 +65,7 @@ class Upload
                 $file = new File();
                 $file->create($this->destDir);
             }
-            $newFileName = $this->newFileName( basename($_FILES[$this->fieldName]['name']) );
+            $newFileName = $this->newFileName( basename(strtolower($_FILES[$this->fieldName]['name'])) );
             $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
 
             if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'], $filePath)) {
@@ -88,21 +88,21 @@ class Upload
 
 				$this->checkAll($idx);
 
-                $newFileName = $this->newFileName( basename($_FILES[$this->fieldName]['name'][$idx]) );
+                $newFileName = $this->newFileName( basename(strtolower($_FILES[$this->fieldName]['name'][$idx])) );
                 $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
 
                 if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'][$idx], $filePath)) {
                     throw new Exception(__('上傳失敗！搬移檔案至目標資料夾時發生錯誤'));
                 }
                 $successed[] = array(
-                    'name'    => $_FILES[$this->fieldName]['name'][$idx],
+                    'name'    => strtolower($_FILES[$this->fieldName]['name'][$idx]),
                     'rename'  => $newFileName,
                     'index'   => $idx,
                 );
 
             } catch ( Exception $ex ) {
                 $failed[] = array(
-                    'name'    => $_FILES[$this->fieldName]['name'][$idx],
+                    'name'    => strtolower($_FILES[$this->fieldName]['name'][$idx]),
                     'index'   => $idx,
                     'message' => $ex->getMessage()
                 );
@@ -195,6 +195,6 @@ class Upload
     }
     public function getOrignalName()
     {
-        return $_FILES[$this->fieldName]['name'];
+        return strtolower($_FILES[$this->fieldName]['name']);
     }
 }
