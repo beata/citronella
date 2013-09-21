@@ -5,11 +5,7 @@ class NotFoundException extends Exception {
         if ( !$message) {
             $message = __('頁面不存在');
         }
-        if (NULL === $previous) {
-            parent::__construct($message, $code);
-        } else {
-            parent::__construct($message, $code, $previous);
-        }
+        parent::__construct($message, $code, $previous);
     }
 }
 
@@ -248,7 +244,7 @@ abstract class Controller
 
         if ( $backLink ) {
             $content = '<div>' . $content . '</div>'
-                . '<div class="alert-actions margin-top"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
+                . '<div class="alert-actions"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
         }
         $this->data['content'] = $content;
         $this->_prepareLayout();
@@ -500,11 +496,11 @@ abstract class Model
                         continue;
                     }
                     if ( is_array($columns[$alias])) { // complex query
-                        foreach ($columns[$alias] as $columnsName => $rawSelect ) {
-                            if ( is_numeric($columnsName)) {
-                                $columnsName = $rawSelect;
+                        foreach ($columns[$alias] as $colName => $rawSelect ) {
+                            if ( is_numeric($colName)) {
+                                $colName = $rawSelect;
                             }
-                            $select[] = '(SELECT ' . $rawSelect . ' FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $columnsName . '`';
+                            $select[] = '(SELECT ' . $rawSelect . ' FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $colName . '`';
                         }
                         continue;
                     }
@@ -523,8 +519,8 @@ abstract class Model
             $select[] = '(SELECT COUNT(*) ' . $fromWhere . ') `' . $alias . '_count`';
 
             if ( isset($columns[$alias])) {
-                foreach ($columns[$alias] as $columnsName => $rawSelect ) {
-                    $select[] = '(SELECT ' . $rawSelect . ' ' . $fromWhere . ') `' . $alias . '_' . $columnsName . '`';
+                foreach ($columns[$alias] as $colName => $rawSelect ) {
+                    $select[] = '(SELECT ' . $rawSelect . ' ' . $fromWhere . ') `' . $alias . '_' . $colName . '`';
                 }
             }
         }
@@ -816,12 +812,12 @@ class DBHelper
     public static function deleteColumnFile($options)
     {
         /* Options
-         * columns  array
-         * table    string
-         * where    string
-         * dir      string
-         * params   array optional
-         * suffixes string optional
+         * [columns]  array
+         * [table]    string
+         * [dir]      string
+         * [where]    string
+         * [params]   array optional
+         * [suffixes] array optional
          */
         extract($options);
 
@@ -837,34 +833,52 @@ class DBHelper
         if ( ! $stmt->rowCount()) {
             return;
         }
-        while ( $item = $stmt->fetch(PDO::FETCH_OBJ)) {
+        while ( $item = $stmt->fetchObject()) {
             foreach ( $columns as $column) {
-                if ( ! $item->{$column}) {
-                    continue;
-                }
-                if ( file_exists($dir . $item->{$column})) {
-                    unlink($dir . $item->{$column});
-                }
+                $delFileOpts = array(
+                    'model' => $item,
+                    'column' => $column,
+                    'dir' => $dir,
+                );
                 if ( isset($options['suffixes'][$column])) {
-                    $info = pathinfo($item->{$column});
-                    if ( !isset($info['filename'])) {
-                        $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
-                    }
-                    $fdir = '';
-                    if ( '.' !== $info['dirname']) {
-                        $fdir = $info['dirname'] . DIRECTORY_SEPARATOR;
-                    }
-                    foreach ($options['suffixes'][$column] as $suffix) {
-                        $filename = $fdir . $info['filename'] . $suffix . '.' . $info['extension'];
-                        if ( file_exists($dir . $filename)) {
-                            unlink($dir . $filename);
-                        }
-                    }
+                    $delFileOpts['suffixes'] = $options['suffixes'][$column];
+                }
+                self::deleteFile($delFileOpts);
+            }
+        }
+    }
+
+    public static function deleteFile($options)
+    {
+        /* Options
+         * [model]    Model
+         * [column]   string
+         * [dir]      string
+         * [suffixes] array
+         */
+        extract($options);
+
+        if ( ! $model->{$column}) {
+            return;
+        }
+        if ( file_exists($dir . $model->{$column})) {
+            unlink($dir . $model->{$column});
+        }
+        if ( isset($options['suffixes'])) {
+            $info = pathinfo($model->{$column});
+            $fdir = '';
+            if ( '.' !== $info['dirname']) {
+                $fdir = $info['dirname'] . DIRECTORY_SEPARATOR;
+            }
+            foreach ($options['suffixes'] as $suffix) {
+                $filename = $fdir . $info['filename'] . $suffix . (isset($info['extension']) ? '.' . $info['extension'] : '');
+                if ( file_exists($dir . $filename)) {
+                    unlink($dir . $filename);
                 }
             }
         }
-
     }
+
     public static function splitCommaList($str)
     {
         if ( is_array($str)) {
@@ -877,22 +891,23 @@ class DBHelper
         return array_combine($array, $array);
     }
 
-    public static function fetchKeyedList(PDOStatement $stmt, $keyColumn='id', $displayColumn=NULL)
+    public static function fetchKeyedList(PDOStatement $stmt, $keyColumn='id', $displayColumn=NULL, $className='stdClass')
     {
         $list = array();
 
         if ( NULL === $displayColumn) {
-            while ( $item = $stmt->fetch(PDO::FETCH_OBJ)) {
+            while ( $item = $stmt->fetchObject($className)) {
                 $list[$item->{$keyColumn}] = $item;
             }
         } else {
-            while ( $item = $stmt->fetch(PDO::FETCH_OBJ)) {
+            while ( $item = $stmt->fetchObject($className)) {
                 $list[$item->{$keyColumn}] = $item->{$displayColumn};
             }
         }
 
         return $list;
     }
+
     // Table Operations
 
     public static function deleteAll($model, $ids)
@@ -1003,14 +1018,6 @@ class DBHelper
     {
         $model = new $model;
         return $model->fields($for);
-    }
-    public static function toKeyPair(PDOStatement $resource, $keyColumn='id', $valueColumn='name')
-    {
-        $result = array();
-        while ( $item = $resource->fetch(PDO::FETCH_OBJ)) {
-            $result[$item->{$keyColumn}] = $item->{$valueColumn};
-        }
-        return $result;
     }
     public static function translateModelSearchArg($model, $search)
     {
@@ -1136,6 +1143,7 @@ class Validator
 
         if ( isset($opt['thumbnails'])) {
             foreach ( $opt['thumbnails'] as $suffix => $sOpt) {
+                $sOpt = (array)$sOpt;
                 if (!isset($sOpt['method'])) {
                     $method = empty($sOpt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
                 } else {
@@ -1497,6 +1505,13 @@ class Validator
 
         if ( ! DBHelper::count($model, $search) ) {
             throw new Exception(__('資料不存在'));
+        }
+        return $value;
+    }
+    public static function hexColor($value)
+    {
+        if (!preg_match("/^#(?:[0-9a-fA-F]{3}){1,2}$/", $value)) {
+            throw new Exception(__('請輸入 HEX 色碼如: #FFF 或 #FFFFFF'));
         }
         return $value;
     }
