@@ -581,6 +581,10 @@ class View
         $return = false;
         extract($options, EXTR_IF_EXISTS);
 
+        if (!empty($_SERVER['HTTP_X_PJAX'])) {
+            $layout = FALSE;
+        }
+
         $this->data = $data;
 
         if ( file_exists($this->getDir($layoutAppId) . $layout . '_functions.php')) {
