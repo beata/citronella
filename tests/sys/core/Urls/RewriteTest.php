@@ -90,11 +90,9 @@ class Sys_Core_Urls_RewriteTest extends PHPUnit_Framework_TestCase
         $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));
         $this->assertEquals('/tests/a/b?p1=v1&amp;p2=v2', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2')));
 
-
         // case 4
         $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));
         $this->assertEquals('/tests/a/b?p1=v1&p2=v2', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2'), array('argSeparator' => '&')));
-
 
         // case 5
         $this->assertEquals('/tests/a/b', $urls->urlto('a/b'));

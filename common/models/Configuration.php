@@ -67,6 +67,7 @@ class Configuration extends Model
         if (empty($this->input_attrs_array)) {
             $this->input_attrs_array = empty($this->input_attrs) ? array() : json_decode($this->input_attrs, true);
         }
+
         return $this->input_attrs_array;
     }
 
@@ -75,6 +76,7 @@ class Configuration extends Model
         if (empty($this->input_options_array)) {
             $this->input_options_array = empty($this->input_options) ? array() : json_decode($this->input_options, true);
         }
+
         return $this->input_options_array;
     }
 
@@ -95,7 +97,7 @@ class Configuration extends Model
 
     public function input()
     {
-        if ( NULL === $this->_input ) {
+        if (NULL === $this->_input) {
             $class = 'Configuration_Input_' . camelize($this->_config['inputTypes'][$this->input_type], true);
             $this->_input = new $class($this);
         }
@@ -141,7 +143,7 @@ class Configuration extends Model
 
     public static function loadAppConfig($groups)
     {
-        $groups = (array)$groups;
+        $groups = (array) $groups;
 
         $fake = new self;
         $types = $fake->getConfig('inputTypes');
@@ -153,7 +155,7 @@ class Configuration extends Model
 
         $list = DBHelper::getList(__CLASS__, $search, NULL, 'load');
         while ( $item = $list->fetchObject(__CLASS__)) {
-            if ( 'checkbox' === $types[$item->input_type]) {
+            if ('checkbox' === $types[$item->input_type]) {
                 $item->value = DBHelper::splitCommaList($item->value);
             }
             $appConf->{$item->id} = $item->value;
@@ -161,9 +163,8 @@ class Configuration extends Model
     }
 }
 
-
-abstract class Configuration_Input {
-
+abstract class Configuration_Input
+{
     protected $m;
 
     public function __construct(Configuration $model)

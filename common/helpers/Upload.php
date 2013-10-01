@@ -19,13 +19,13 @@ class Upload
         $this->allowTypes = $allowTypes;
         $this->denyFiles = $denyFiles;
     }
-	public function checkAll($idx=NULL)
-	{
+    public function checkAll($idx=NULL)
+    {
         if ( ! isset($_FILES[$this->fieldName])) {
             throw new Exception(__('請上傳檔案'));
         }
 
-		if ( NULL === $idx ) {
+        if (NULL === $idx) {
             $this->checkError( $_FILES[$this->fieldName]['error']);
             $this->checkSize( $_FILES[$this->fieldName]['size']);
 
@@ -36,20 +36,21 @@ class Upload
             if ( !empty($this->allowTypes)) {
                 $this->checkType( $ext, $_FILES[$this->fieldName]['type'] );
             }
-			return;
-		}
 
-		$this->checkError( $_FILES[$this->fieldName]['error'][$idx]);
-		$this->checkSize( $_FILES[$this->fieldName]['size'][$idx]);
+            return;
+        }
+
+        $this->checkError( $_FILES[$this->fieldName]['error'][$idx]);
+        $this->checkSize( $_FILES[$this->fieldName]['size'][$idx]);
 
         $ext = pathinfo(strtolower($_FILES[$this->fieldName]['name'][$idx]), PATHINFO_EXTENSION);
         if ( !empty($this->denyFiles)) {
             $this->checkExtension( $ext );
         }
-		if ( !empty($this->allowTypes)) {
-			$this->checkType( $ext, $_FILES[$this->fieldName]['type'][$idx] );
-		}
-	}
+        if ( !empty($this->allowTypes)) {
+            $this->checkType( $ext, $_FILES[$this->fieldName]['type'][$idx] );
+        }
+    }
     public function save()
     {
         if ( ! isset($_FILES[$this->fieldName])) {
@@ -59,7 +60,7 @@ class Upload
         // single file upload
         if ( ! is_array($_FILES[$this->fieldName]['name'])) {
 
-			$this->checkAll();
+            $this->checkAll();
 
             if ( ! file_exists($this->destDir)) {
                 $file = new File();
@@ -71,6 +72,7 @@ class Upload
             if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'], $filePath)) {
                 throw new Exception(__('上傳失敗！搬移檔案至目標資料夾時發生錯誤'));
             }
+
             return $newFileName;
 
         }
@@ -83,10 +85,10 @@ class Upload
         $successed = array();
         $failed = array();
 
-        foreach ( $_FILES[$this->fieldName]['name'] as $idx => $file) {
+        foreach ($_FILES[$this->fieldName]['name'] as $idx => $file) {
             try {
 
-				$this->checkAll($idx);
+                $this->checkAll($idx);
 
                 $newFileName = $this->newFileName( basename(strtolower($_FILES[$this->fieldName]['name'][$idx])) );
                 $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
@@ -108,14 +110,15 @@ class Upload
                 );
             }
         }
+
         return compact('successed', 'failed');
     }
     public function checkSize($size)
     {
-        if ( ! $size ) {
+        if (! $size) {
             throw new Exception(__('所上傳的檔案是空的，請另外上傳有內容的檔案'));
         }
-        if ( $this->maxSize && $this->maxSize < $size ) {
+        if ($this->maxSize && $this->maxSize < $size) {
             throw new Exception(sprintf(__('只能上傳大小不超過%s的檔案'), File::formatBytes($this->maxSize)));
         }
     }
@@ -132,7 +135,7 @@ class Upload
         if ( ! isset($this->allowTypes[$ext])) {
             throw new Exception($message);
         }
-        foreach ( $this->allowTypes as $ext => $mimes ) {
+        foreach ($this->allowTypes as $ext => $mimes) {
             if ( in_array($type, $mimes)) {
                 return;
             }
@@ -142,23 +145,24 @@ class Upload
     /**
      * 產生不重複的新檔名
      *
-     * @param string $filename 舊檔名
+     * @param  string $filename 舊檔名
      * @return string
      */
     public function newFileName( $filename )
     {
-        if ( false === $this->rename ) {
+        if (false === $this->rename) {
             return $filename;
         }
 
         $ext = pathinfo($filename, PATHINFO_EXTENSION);
         $ext = '' === $ext ? '' : '.' . strtolower($ext);
 
-        if ( true === $this->rename ) {
+        if (true === $this->rename) {
             $name = date('YmdHis') . '.' . mt_rand(1000, 9999);
             while ( file_exists($this->destDir . DIRECTORY_SEPARATOR . $name . $ext)) {
                 $name = date('YmdHis') . '-' . mt_rand(1000, 9999);
             }
+
             return $name . $ext;
         }
 

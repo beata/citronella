@@ -21,12 +21,11 @@ class Sys_Core_RouteTest extends PHPUnit_Framework_TestCase
     public static function tearDownAfterClass()
     {
         $_SERVER['SERVER_SOFTWARE'] = self::$origEnv['SERVER_SOFTWARE'];
-        if ( NULL === $_SERVER['SERVER_SOFTWARE']) {
+        if (NULL === $_SERVER['SERVER_SOFTWARE']) {
             unset($_SERVER['SERVER_SOFTWARE']);
         }
         $GLOBALS['config']['enable_rewrite'] = App::conf()->enable_rewrite = self::$origEnv['enable_rewrite'];
     }
-
 
     public function setUp()
     {
@@ -74,6 +73,7 @@ class Sys_Core_RouteTest extends PHPUnit_Framework_TestCase
     {
         $route = new Route($this->_routes);
         $route->appendDefaultRoute();
+
         return $route;
     }
 

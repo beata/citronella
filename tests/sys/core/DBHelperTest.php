@@ -222,4 +222,3 @@ class Sys_Core_DBHelperTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(array('1'=>1,'2'=>2,'3'=>3), DBHelper::splitCommaList($data));
     }
 }
-

@@ -21,7 +21,6 @@ class Sys_Core_AppTest extends PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('is_ssl', $_REQUEST);
         $this->assertArrayHasKey('IS_IIS', $_SERVER);
 
-
         $_SERVER['SERVER_SOFTWARE'] = 'microsoft-iis';
         App::prepare();
         $this->assertArrayHasKey('REQUEST_URI', $_SERVER);

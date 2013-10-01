@@ -25,7 +25,6 @@ abstract class Attachment extends Model
         )
     );
 
-
     public function fields()
     {
         return array(
@@ -70,13 +69,13 @@ abstract class Attachment extends Model
     public function bunchActions($foreignKey, &$input, $dataKeys)
     {
         try {
-            foreach ( $dataKeys as $action => $key) {
+            foreach ($dataKeys as $action => $key) {
                 if ( empty($input[$key]) || !is_array($input[$key])) {
                     continue;
                 }
                 $method = 'bunch' . camelize($action, true);
 
-                if ( 'create' === $action) {
+                if ('create' === $action) {
                     $this->{$method}($foreignKey, $input[$key], $key);
                 } else {
                     $this->{$method}($input[$key]);
@@ -93,11 +92,11 @@ abstract class Attachment extends Model
         $updates = array('name', 'description', 'sort');
         $model = $this->_config['model'];
         $m = new $model;
-        foreach ( $input as $id => $data) {
+        foreach ($input as $id => $data) {
             $m->id = $id;
             $m->name = $data['name'];
             $m->description = $data['description'];
-            $m->sort = (int)$data['sort'];
+            $m->sort = (int) $data['sort'];
             $m->update($updates);
         }
     }
@@ -109,7 +108,7 @@ abstract class Attachment extends Model
 
         $rconf = $this->_config['belongsTo']['parent'];
         try {
-            foreach ( $input as $key => $data ) {
+            foreach ($input as $key => $data) {
                 $m = new $model;
                 $m->{$rconf['relKey']} = $relKey;
 
@@ -122,7 +121,7 @@ abstract class Attachment extends Model
                     $fields['file'] = true;
                     $fields['mime'] = true;
                     $m->mime = $m->file_type;
-                    if ( !$m->name ) {
+                    if (!$m->name) {
                         $info = pathinfo($m->file_orignal_name);
                         if ( !isset($info['filename'])) {
                             $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
@@ -166,7 +165,7 @@ abstract class Attachment extends Model
 
     public function getListByParent($relKey)
     {
-        if ( ! $relKey) {
+        if (! $relKey) {
             return null;
         }
 
@@ -179,6 +178,7 @@ abstract class Attachment extends Model
             'sortDir' => 'asc',
             'rowsPerPage' => false
         ));
+
         return DBHelper::getList($this->_config['model'], $search, $pager);
     }
 
@@ -192,6 +192,7 @@ abstract class Attachment extends Model
             default:
                 break;
         }
+
         return implode(',', $select);
     }
 }

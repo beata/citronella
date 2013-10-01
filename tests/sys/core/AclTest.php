@@ -55,7 +55,6 @@ class Sys_Core_AclTest extends PHPUnit_Framework_TestCase
 
         $this->_acl = new Acl($rules);
 
-
         $this->_getRoleRules = new \ReflectionMethod('Acl', '_getRoleRules');
         $this->_getRoleRules->setAccessible(true);
 
@@ -74,7 +73,6 @@ class Sys_Core_AclTest extends PHPUnit_Framework_TestCase
                 'auth/reset-password-auth',
                 'auth/reset-password' ),
         ), $rule);
-
 
         $_REQUEST['controller'] = 'aa';
         $_REQUEST['action'] = 'bb';
@@ -139,7 +137,6 @@ class Sys_Core_AclTest extends PHPUnit_Framework_TestCase
         $this->_acl->check();
         $this->assertEquals('auth', $_REQUEST['controller']);
         $this->assertEquals('login', $_REQUEST['action']);
-
 
         $_REQUEST['controller'] = 'auth';
         $_REQUEST['action'] = 'login';

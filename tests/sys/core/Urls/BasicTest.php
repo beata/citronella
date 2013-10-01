@@ -85,11 +85,9 @@ class Sys_Core_Urls_BasicTest extends PHPUnit_Framework_TestCase
         $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));
         $this->assertEquals('/tests/?p1=v1&amp;p2=v2&amp;q=a/b', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2')));
 
-
         // case 4
         $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));
         $this->assertEquals('/tests/?p1=v1&p2=v2&q=a/b', $urls->urlto('a/b', array('p1' => 'v1', 'p2' => 'v2'), array('argSeparator' => '&')));
-
 
         // case 5
         $this->assertEquals('/tests/?q=a/b', $urls->urlto('a/b'));

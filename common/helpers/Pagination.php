@@ -93,7 +93,7 @@ class Pagination
             'next' => _e('下一頁'),
             'last' => _e('最末頁')
         );
-        foreach ( $config as $key => $value ) {
+        foreach ($config as $key => $value) {
             if ( is_array($value) && !empty($this->{$key})) {
                 $this->{$key} = array_merge($this->{$key}, $value);
             } else {
@@ -106,15 +106,14 @@ class Pagination
         if (NULL === $this->segment) {
             $pageNum = isset($_GET[$this->param]) ? $_GET[$this->param] : 1;
         } else {
-            if (!($pageNum = (int)App::urls()->segment($this->segment))) {
+            if (!($pageNum = (int) App::urls()->segment($this->segment))) {
                 $pageNum = 1;
             }
         }
         $this->setCurrentPage($pageNum);
 
         $this->_origDir = $this->sortDir;
-        if ( isset($_GET[$this->paramSort]))
-        {
+        if ( isset($_GET[$this->paramSort])) {
             $field = $_GET[$this->paramSort];
             $dir = $this->sortDir;
             if ( strpos($field, '.desc') !== false || strpos($field, '.asc') !== false ) {
@@ -128,29 +127,32 @@ class Pagination
     }
     public function setCurrentPage($pageNum)
     {
-        $this->currentPage = min($this->totalPages, max(1, (int)$pageNum));
+        $this->currentPage = min($this->totalPages, max(1, (int) $pageNum));
         $this->rowStart = max(0, ($this->currentPage - 1)) * $this->rowsPerPage;
     }
     public function info()
     {
-        if ( $this->info ) {
+        if ($this->info) {
             return $this->info;
         }
+
         return sprintf(_e($this->infoFormat), '<strong>' . $this->totalRows . '</strong>', '<strong>' . $this->totalPages . '</strong>');
     }
     public function getSqlLimit()
     {
         $limit = '';
-        if ( $this->rowsPerPage) {
+        if ($this->rowsPerPage) {
             $limit = ' LIMIT ' . $this->rowStart . ',' . $this->rowsPerPage;
         }
+
         return $limit;
     }
     public function getSqlGroupBy()
     {
-        if ( $this->groupBy) {
+        if ($this->groupBy) {
             return ' GROUP BY ' . $this->groupBy;
         }
+
         return '';
     }
     public function getSqlOrderBy()
@@ -158,9 +160,9 @@ class Pagination
         $list = array();
 
         if ( !empty($this->primarySortField)) {
-            foreach ($this->primarySortField as $idx => $name ) {
+            foreach ($this->primarySortField as $idx => $name) {
                 $dir = $this->primarySortDir[$idx];
-                if ($this->sortDir !== $this->_origDir)  { // when main direction has been changed
+                if ($this->sortDir !== $this->_origDir) { // when main direction has been changed
                     $dir = 'asc' === $dir ? 'desc' : 'asc'; // change primarySortDir as well
                 }
                 $list[] = '`' . $name . '` ' . $dir;
@@ -170,23 +172,25 @@ class Pagination
         $list[] = '`' . $this->sortField . '` ' . $this->sortDir;
 
         if ( !empty($this->secondSortField)) {
-            foreach ($this->secondSortField as $idx => $name ) {
+            foreach ($this->secondSortField as $idx => $name) {
                 $dir = $this->secondSortDir[$idx];
-                if ($this->sortDir !== $this->_origDir)  { // when main direction has been changed
+                if ($this->sortDir !== $this->_origDir) { // when main direction has been changed
                     $dir = 'asc' === $dir ? 'desc' : 'asc'; // change secondSortDir as well
                 }
                 $list[] = '`' . $name . '` ' . $dir;
             }
         }
+
         return ' ORDER BY ' . implode(',', $list);
 
     }
     public function pages($showInfo=false, $cssClass='pagination-centered')
     {
-        if ( $this->totalPages < 2) {
-            if ( $showInfo ) {
+        if ($this->totalPages < 2) {
+            if ($showInfo) {
                 echo '<div class="pagination ', $cssClass, '"><p class="pagination-info">', $this->info(), '</p></div>';
             }
+
             return;
         }
 
@@ -210,7 +214,7 @@ class Pagination
         );
 
         // first page
-        if ( $this->currentPage != 1) {
+        if ($this->currentPage != 1) {
             $_url = $this->__pageUrl(1);
             $class = '';
         } else {
@@ -219,7 +223,7 @@ class Pagination
         echo '<li class="first', $class, '"><a href="', $_url, '">', $this->labels['first'], '</a></li>';
 
         // previous page
-        if ( $this->currentPage > 1) {
+        if ($this->currentPage > 1) {
             $_url = $this->__pageUrl(($this->currentPage-1));
             $class = '';
         } else {
@@ -228,7 +232,7 @@ class Pagination
         echo '<li class="previous', $class, '"><a href="', $_url, '">', $this->labels['prev'], '</a></li>';
 
         // page numbers
-        if ( $this->showNumbers) {
+        if ($this->showNumbers) {
             foreach ( range($numStart, $numEnd) as $num):
                 echo '<li',
                     ( $num == $this->currentPage ? ' class="active"' : '' ),
@@ -236,7 +240,7 @@ class Pagination
             endforeach;
         }
 
-        if ( $this->showJumper) {
+        if ($this->showJumper) {
             echo '<li><span class="hidden-desktop"><select class="pagination-jumper" data-go-selected="', $this->__pageUrl('_-pageNum-_'), '">';
             foreach ( range($numStart, $numEnd) as $num):
                 echo '<option value="', $num, '"',
@@ -247,7 +251,7 @@ class Pagination
         }
 
         // next page
-        if ( $this->currentPage < $this->totalPages ) {
+        if ($this->currentPage < $this->totalPages) {
             $_url =  $this->__pageUrl(($this->currentPage+1));
             $class = '';
         } else {
@@ -256,7 +260,7 @@ class Pagination
         echo '<li class="next', $class, '"><a href="', $_url, '">', $this->labels['next'], '</a></li>';
 
         // last page
-        if ( $this->currentPage != $this->totalPages ) {
+        if ($this->currentPage != $this->totalPages) {
             $_url =  $this->__pageUrl($this->totalPages);
             $class = '';
         } else {
@@ -266,7 +270,7 @@ class Pagination
 
         echo '</ul>';
 
-        if ( $showInfo ) {
+        if ($showInfo) {
             echo '<p class="pagination-info">', $this->info(), '</p>';
         }
 
@@ -288,13 +292,14 @@ class Pagination
         $urls = App::urls();
         $segments = $urls->allSegments();
         $segments[$this->segment] = $pageNum;
+
         return $urls->urlto(implode('/', $segments));
     }
     public function sortLink($fieldName, $displayName, $attrs=NULL, $symbalAsc=NULL, $symbalDesc=NULL)
     {
         static $url_part = NULL;
 
-        if ( $url_part === NULL ) {
+        if ($url_part === NULL) {
             $params = $_GET;
             unset($params[$this->paramSort]);
             if ( $url_part = http_build_query($params, '', '&amp;')) {
@@ -303,14 +308,14 @@ class Pagination
                 $url_part = '?' . $this->paramSort . '=';
             }
         }
-        if ( $fieldName === $this->sortField ) {
+        if ($fieldName === $this->sortField) {
             $symbal = ($this->sortDir === 'asc'
                 ? ( $symbalAsc === NULL ? $this->symbalAsc : $symbalAsc)
                 : ( $symbalDesc === NULL ? $this->symbalDesc : $symbalDesc) );
         } else {
             $symbal = null;
         }
-        if ( $fieldName === $this->sortField && $this->sortDir === 'asc' ) {
+        if ($fieldName === $this->sortField && $this->sortDir === 'asc') {
             $url = $url_part . $fieldName . '.desc'; // desc
         } else {
             $url = $url_part . $fieldName . '.asc'; // asc
@@ -322,6 +327,7 @@ class Pagination
         $symbal = ($this->sortDir === 'asc'
             ? ( $symbalAsc === NULL ? $this->symbalAsc : $symbalAsc)
             : ( $symbalDesc === NULL ? $this->symbalDesc : $symbalDesc) );
+
         return $this->sortable[$this->sortField] . $symbal;
     }
 

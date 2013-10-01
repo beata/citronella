@@ -1,8 +1,9 @@
 <?php
-class NotFoundException extends Exception {
+class NotFoundException extends Exception
+{
     public function __construct($message='', $code=0, Exception $previous=NULL)
     {
-        if ( !$message) {
+        if (!$message) {
             $message = __('頁面不存在');
         }
         parent::__construct($message, $code, $previous);
@@ -16,7 +17,7 @@ class App
 
     private static function _array2Obj($array)
     {
-        foreach ( $array as $k => $value ) {
+        foreach ($array as $k => $value) {
             if ( is_array($value)) {
                 $keys = array_keys($value);
                 if ( ! is_numeric($keys[0])) {
@@ -24,14 +25,15 @@ class App
                 }
             }
         }
+
         return (object) $array;
     }
     /**
      * 啟動應用程式
      *
-     * @param array $routeConfig
-     * @param array $aclConfig
-     * @param string $aclRole
+     * @param  array  $routeConfig
+     * @param  array  $aclConfig
+     * @param  string $aclRole
      * @return void
      */
     public static function run($routeConfig=NULL, $aclConfig=NULL, $aclRole='anonymous')
@@ -78,7 +80,7 @@ class App
     public static function doAction($controllerName, $actionName)
     {
         // load file
-        if ( '_' === $actionName{0} ) {
+        if ('_' === $actionName{0}) {
             throw new NotFoundException(_e('頁面不存在'));
         }
         $class = camelize($controllerName);
@@ -94,7 +96,7 @@ class App
         $controller = new $class();
 
         if ( ! is_callable(array($controller, $action))) {
-            if ( ! $controller->defaultAction ) {
+            if (! $controller->defaultAction) {
                 throw new NotFoundException(_e('頁面不存在'));
             }
             $action = $controller->defaultAction;
@@ -111,42 +113,44 @@ class App
         }
     }
 
-
     public static function route($routeConfig=NULL)
     {
         static $route;
 
-        if ( NULL === $route ) {
+        if (NULL === $route) {
             $route = new Route($routeConfig);
             $route->appendDefaultRoute();
-        } elseif ( NULL !== $routeConfig ) {
+        } elseif (NULL !== $routeConfig) {
             $route->setRoutes($routeConfig);
             $route->appendDefaultRoute();
         }
+
         return $route;
     }
     public static function acl($aclConfig=NULL, $aclRole=NULL)
     {
         static $acl;
 
-        if ( NULL === $acl ) {
+        if (NULL === $acl) {
             $acl = new Acl($aclConfig, $aclRole);
         }
+
         return $acl;
     }
     public static function conf()
     {
         static $conf = NULL;
-        if ( $conf === NULL) {
+        if ($conf === NULL) {
             $conf = self::_array2Obj($GLOBALS['config']);
         }
+
         return $conf;
     }
     public static function db()
     {
        static $db;
 
-        if ( $db === NULL ) {
+        if ($db === NULL) {
             $conf = App::conf();
             $dsn = 'mysql:host=' . $conf->db->host
                     . ';dbname=' . $conf->db->name
@@ -160,6 +164,7 @@ class App
             }
             $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         }
+
         return $db;
     }
     public static function urls($id='primary', $urlBase=NULL, $paramName='q')
@@ -168,9 +173,9 @@ class App
             return self::$_urlsList[$id];
         }
         $urlBase = rtrim($urlBase, '/') . '/';
+
         return (self::$_urlsList[$id] = new Urls( $urlBase, $paramName ));
     }
-
 
     public static function view($appId=NULL)
     {
@@ -183,13 +188,14 @@ class App
         if ($i18n === NULL) {
             $i18n = new I18N($config);
         }
+
         return $i18n;
     }
 
     public static function loadHelper($class, $createObj=false, $appId=NULL)
     {
         require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/helpers/' . $class . '.php';
-        if ( $createObj ) {
+        if ($createObj) {
             return new $class;
         }
     }
@@ -197,15 +203,16 @@ class App
     {
         require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/models/' . $model. '.php';
 
-        if ( $createObj ) {
+        if ($createObj) {
             return new $model;
         }
     }
     public static function loadViewModel($viewModelName, $createObj=false, $baseUrl=NULL, $appId=NULL)
     {
         require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/viewModels/' . $viewModelName . '.php';
-        if ( $createObj ) {
+        if ($createObj) {
             $vm = $viewModelName . 'ViewModel';
+
             return new $vm($createObj, $baseUrl);
         }
     }
@@ -227,7 +234,7 @@ abstract class Controller
     }
     public function _show404($backLink=false, $content=NULL, $layout='layout')
     {
-        if ( FALSE === $_SERVER['IS_IIS'] ) {
+        if (FALSE === $_SERVER['IS_IIS']) {
             header('HTTP/1.0 404 Not Found', true, 404);
             header('Status: 404');
         }
@@ -242,7 +249,7 @@ abstract class Controller
             $backLink = false;
         }
 
-        if ( $backLink ) {
+        if ($backLink) {
             $content = '<div>' . $content . '</div>'
                 . '<div class="alert-actions"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
         }
@@ -255,11 +262,12 @@ abstract class Controller
     public function _loadModule($module, $createObj=true, $appId=NULL)
     {
         require_once ROOT_PATH . ($appId ? $appId : App::$id) . '/modules/' . $module . '.php';
-        if ( $createObj ) {
+        if ($createObj) {
             $module = $module . 'Module';
             if ( is_array($createObj)) {
                 return new $module($this, $createObj);
             }
+
             return new $module($this, NULL);
         }
     }
@@ -292,7 +300,7 @@ abstract class BaseController extends Controller
             }
             $response = $obj->{$method}();
         } catch ( Exception $ex ) {
-            if ( $this->_apiSendFailHeader) {
+            if ($this->_apiSendFailHeader) {
                 header('HTTP/1.1 400 Bad Request');
             }
             $response = array( 'error' => array( 'message' => $ex->getMessage() ) );
@@ -327,8 +335,8 @@ abstract class Module
     public function __construct($controller, $members=NULL)
     {
         $this->c = $controller;
-        if ( $members !== NULL) {
-            foreach ( $members as $key => $value) {
+        if ($members !== NULL) {
+            foreach ($members as $key => $value) {
                 $this->{$key} = $value;
             }
         }
@@ -358,11 +366,11 @@ abstract class Model
     }
     public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
     {
-        if ( NULL === $input) {
+        if (NULL === $input) {
             $input = &$_POST;
         }
 
-        if ( $verify ) {
+        if ($verify) {
             $this->verify($fields, $input, $args);
         }
 
@@ -372,7 +380,7 @@ abstract class Model
 
         if ( $this->_customId || ! $this->hasPrimaryKey()) {
             if ( is_array($this->_config['primaryKey'])) {
-                foreach ( $this->_config['primaryKey'] as $key) {
+                foreach ($this->_config['primaryKey'] as $key) {
                     if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
                         $fields[$key] = true;
                     }
@@ -404,6 +412,7 @@ abstract class Model
 
         if ( ! is_array($this->_config['primaryKey'])) {
             $this->{$this->_config['primaryKey']} = $db->lastInsertId();
+
             return;
         }
         if ( in_array('id', $this->_config['primaryKey']) && ! $this->id) {
@@ -422,7 +431,7 @@ abstract class Model
             $where = array( $this->_config['primaryKey'] => $this->{$this->_config['primaryKey']} );
         } else {
             $where = array();
-            foreach ( $this->_config['primaryKey'] as $key) {
+            foreach ($this->_config['primaryKey'] as $key) {
                 $where[$key] = $this->{$key};
             }
         }
@@ -437,7 +446,7 @@ abstract class Model
             $where = array( $this->_config['primaryKey'] => $this->{$this->_config['primaryKey']} );
         } else {
             $where = array();
-            foreach ( $this->_config['primaryKey'] as $key) {
+            foreach ($this->_config['primaryKey'] as $key) {
                 $where[$key] = $this->{$key};
             }
         }
@@ -450,20 +459,19 @@ abstract class Model
         if ( ! is_array($this->_config['primaryKey'])) {
             return !empty($this->{$this->_config['primaryKey']});
         }
-        foreach ($this->_config['primaryKey'] as $key ) {
-            if ( $this->{$key} === NULL ) {
+        foreach ($this->_config['primaryKey'] as $key) {
+            if ($this->{$key} === NULL) {
                 return false;
             }
         }
+
         return true;
     }
-
-
 
     // Model Config
     public function getConfig($key=null)
     {
-        if ( NULL !== $key) {
+        if (NULL !== $key) {
             return isset($this->_config[$key]) ? $this->_config[$key] : null;
         }
 
@@ -474,6 +482,7 @@ abstract class Model
     {
         if ( !is_array($props)) {
             $this->_config[$props] = $value;
+
             return;
         }
         foreach ($props as $key => $value) {
@@ -484,7 +493,7 @@ abstract class Model
     // select relational
     public static function selectBelongsTo(&$select, $config, $columns='name')
     {
-        foreach ( $config as $alias => $rconf) {
+        foreach ($config as $alias => $rconf) {
             if ( is_string($columns)) {
                 $select[] = '(SELECT `' . $columns . '` FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $columns . '`';
                 continue;
@@ -496,7 +505,7 @@ abstract class Model
                         continue;
                     }
                     if ( is_array($columns[$alias])) { // complex query
-                        foreach ($columns[$alias] as $colName => $rawSelect ) {
+                        foreach ($columns[$alias] as $colName => $rawSelect) {
                             if ( is_numeric($colName)) {
                                 $colName = $rawSelect;
                             }
@@ -519,13 +528,12 @@ abstract class Model
             $select[] = '(SELECT COUNT(*) ' . $fromWhere . ') `' . $alias . '_count`';
 
             if ( isset($columns[$alias])) {
-                foreach ($columns[$alias] as $colName => $rawSelect ) {
+                foreach ($columns[$alias] as $colName => $rawSelect) {
                     $select[] = '(SELECT ' . $rawSelect . ' ' . $fromWhere . ') `' . $alias . '_' . $colName . '`';
                 }
             }
         }
     }
-
 
 }
 abstract class ViewModel
@@ -596,11 +604,12 @@ class View
         $content_html = ob_get_contents();
         ob_end_clean();
 
-        if ( ! $layout ) {
-            if ( $return ) {
+        if (! $layout) {
+            if ($return) {
                 return $content_html;
             }
             echo $content_html;
+
             return null;
         }
 
@@ -609,14 +618,16 @@ class View
         $layout_html = explode('{{content_html}}', ob_get_contents());
         ob_end_clean();
 
-        if ( ! $return ) {
+        if (! $return) {
             echo $layout_html[0];
             echo $content_html;
             if ( isset($layout_html[1]) ) {
                 echo $layout_html[1];
             }
+
             return;
         }
+
         return $layout_html[0] . $content_html . $layout_html[1];
     }
     public function startAddon($hook)
@@ -643,8 +654,8 @@ class View
         return isset($this->_addons[$hook]);
     }
 } // END class
-class Search {
-
+class Search
+{
     public $where = array();
     public $params = array();
 
@@ -658,7 +669,7 @@ class DBHelper
     public static function isUniqIn($table, $field, $value, $id=NULL)
     {
         $sql = 'SELECT COUNT(*) = 0 FROM ' . $table . ' WHERE ';
-        if ( $id ) {
+        if ($id) {
             $sql .= ' `id` != ? AND ';
             $params[] = $id;
         }
@@ -668,14 +679,14 @@ class DBHelper
         $stmt = App::db()->prepare($sql);
         $stmt->execute($params);
 
-        return (bool)$stmt->fetchColumn();
+        return (bool) $stmt->fetchColumn();
     }
     public static function clearNewFiles($data)
     {
         if ( empty($data->_new_files)) {
             return;
         }
-        foreach ( $data->_new_files as $file) {
+        foreach ($data->_new_files as $file) {
             if ( file_exists($file)) {
                 unlink($file);
             }
@@ -686,6 +697,7 @@ class DBHelper
         if ( sizeof($array) === 0) {
             return;
         }
+
         return $field . ' IN (' . implode(',', array_map(array(App::db(), 'quote'), $array)) . ')';
     }
 
@@ -698,12 +710,12 @@ class DBHelper
             return '1=1';
         }
 
-        foreach ( $array as $key => $value) {
+        foreach ($array as $key => $value) {
             if ( is_array($value) ) {
                 if ( count($value) > 1) {
                     $sql[] = '(' . self::where($value) . ')';
                 } else {
-                    foreach ( $value as $k => $v) {
+                    foreach ($value as $k => $v) {
                         $sql[] = '`' . $k . '` = ' . $db->quote($v);
                     }
                 }
@@ -711,92 +723,95 @@ class DBHelper
                 $sql[] = '`' . $key . '` = ' . $db->quote($value);
             }
         }
+
         return '(' . implode(' OR ', $sql) . ')';
     }
     public static function where($array)
     {
         $db = App::db();
         $sql = array();
-        foreach ( $array as $key => $value) {
+        foreach ($array as $key => $value) {
             $sql[] = '`' . $key . '` = ' . $db->quote($value);
         }
+
         return implode(' AND ', $sql);
     }
     public static function toSetSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $sql = array();
-        foreach ( $fields as $field ) {
+        foreach ($fields as $field) {
             $sql[] = '`'.$field.'` = ?';
             $params[] = $data->{$field};
         }
         if ( ! empty($rawValueFields)) {
-            foreach ( $rawValueFields as $field => $value) {
+            foreach ($rawValueFields as $field => $value) {
                 $sql[] = '`'.$field.'` = ' . $value;
             }
         }
+
         return implode(',', $sql);
     }
     public static function toKeySetSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $sql = array();
-        foreach ( $fields as $field ) {
+        foreach ($fields as $field) {
             $sql[] = '`'.$field.'` = :'.$field;
             $params[':'.$field] = $data->{$field};
         }
         if ( ! empty($rawValueFields)) {
-            foreach ( $rawValueFields as $field => $value) {
+            foreach ($rawValueFields as $field => $value) {
                 $sql[] = '`'.$field.'` = ' . $value;
             }
         }
+
         return implode(',', $sql);
     }
     public static function toInsertSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $columns = $values = array();
-        foreach ( $fields as $field ) {
+        foreach ($fields as $field) {
             $columns[] = $field;
             $values[] = '?';
             $params[] = $data->{$field};
         }
         if ( ! empty($rawValueFields)) {
-            foreach ( $rawValueFields as $field => $value) {
+            foreach ($rawValueFields as $field => $value) {
                 $columns[] = $field;
                 $values[] = $value;
             }
         }
+
         return '(`'.implode('`,`', $columns).'`) VALUES ('.implode(',', $values).')';
     }
     public static function toKeyInsertSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $columns = $values = array();
-        foreach ( $fields as $field ) {
+        foreach ($fields as $field) {
             $columns[] = $field;
             $values[] = ':'.$field;
             $params[':'.$field] = $data->{$field};
         }
         if ( ! empty($rawValueFields)) {
-            foreach ( $rawValueFields as $field => $value) {
+            foreach ($rawValueFields as $field => $value) {
                 $columns[] = $field;
                 $values[] = $value;
             }
         }
+
         return '(`'.implode('`,`', $columns).'`) VALUES ('.implode(',', $values).')';
     }
     /**
-     * @param string $req : the query on which link the values
-     * @param array $array : associative array containing the values to bind
-     * @param array $typeArray : associative array with the desired value for its corresponding key in $array
+     * @param string $req       : the query on which link the values
+     * @param array  $array     : associative array containing the values to bind
+     * @param array  $typeArray : associative array with the desired value for its corresponding key in $array
      * */
     public static function bindArrayValue($req, $array, $typeArray = false)
     {
-        if(is_object($req) && ($req instanceof PDOStatement))
-        {
-            foreach($array as $key => $value)
-            {
+        if (is_object($req) && ($req instanceof PDOStatement)) {
+            foreach ($array as $key => $value) {
                 if($typeArray)
                     $req->bindValue("$key",$value,(isset($typeArray[$key])?$typeArray[$key]:PDO::PARAM_STR));
-                else
-                {
+                else {
                     if(is_int($value))
                         $param = PDO::PARAM_INT;
                     elseif(is_bool($value))
@@ -825,7 +840,6 @@ class DBHelper
          */
         extract($options);
 
-
         $columns = $options['columns'];
 
         if ( empty($options['params'])) {
@@ -838,7 +852,7 @@ class DBHelper
             return;
         }
         while ( $item = $stmt->fetchObject()) {
-            foreach ( $columns as $column) {
+            foreach ($columns as $column) {
                 $delFileOpts = array(
                     'model' => $item,
                     'column' => $column,
@@ -862,7 +876,7 @@ class DBHelper
          */
         extract($options);
 
-        if ( ! $model->{$column}) {
+        if (! $model->{$column}) {
             return;
         }
         if ( file_exists($dir . $model->{$column})) {
@@ -871,7 +885,7 @@ class DBHelper
         if ( isset($options['suffixes'])) {
             $info = pathinfo($model->{$column});
             $fdir = '';
-            if ( '.' !== $info['dirname']) {
+            if ('.' !== $info['dirname']) {
                 $fdir = $info['dirname'] . DIRECTORY_SEPARATOR;
             }
             foreach ($options['suffixes'] as $suffix) {
@@ -888,10 +902,11 @@ class DBHelper
         if ( is_array($str)) {
             return $str;
         }
-        if ( NULL === $str || '' === $str) {
+        if (NULL === $str || '' === $str) {
             return array();
         }
         $array = explode(',', $str);
+
         return array_combine($array, $array);
     }
 
@@ -899,7 +914,7 @@ class DBHelper
     {
         $list = array();
 
-        if ( NULL === $displayColumn) {
+        if (NULL === $displayColumn) {
             while ( $item = $stmt->fetchObject($className)) {
                 $list[$item->{$keyColumn}] = $item;
             }
@@ -937,7 +952,7 @@ class DBHelper
         $params = array();
 
         $fields = array_keys($data);
-        $data = (object)$data;
+        $data = (object) $data;
         $sql = DBHelper::toKeySetSql($data, $fields, $params, $rawValueFields);
         $stmt = App::db()->prepare('UPDATE `' . $mconf['table'] . '` SET ' . $sql . ' WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
         $stmt->execute($params);
@@ -953,6 +968,7 @@ class DBHelper
 
         $stmt = App::db()->prepare('SELECT COUNT(' . $countWith . ') `counts` FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
         $stmt->execute($params);
+
         return $stmt->fetchColumn();
     }
 
@@ -966,7 +982,7 @@ class DBHelper
 
         $pagerInfo = null;
 
-        if ( NULL !== $pager) {
+        if (NULL !== $pager) {
             $pagerInfo = $pager->getSqlGroupBy() . $pager->getSqlOrderBy() . $pager->getSqlLimit();
         } else {
             $pagerInfo = '';
@@ -985,6 +1001,7 @@ class DBHelper
 
         $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
         $stmt->execute($params);
+
         return $stmt;
     }
 
@@ -1009,9 +1026,10 @@ class DBHelper
         $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $searchInfo . ' LIMIT 1');
         $stmt->execute($params);
 
-        if ( NULL !== $fetchIntoObject ) {
+        if (NULL !== $fetchIntoObject) {
             $stmt->setFetchMode(PDO::FETCH_INTO, $fetchIntoObject);
             $stmt->fetch(PDO::FETCH_OBJ);
+
             return $fetchIntoObject;
         }
 
@@ -1021,6 +1039,7 @@ class DBHelper
     public static function getFields($model, $for=null)
     {
         $model = new $model;
+
         return $model->fields($for);
     }
     public static function translateModelSearchArg($model, $search)
@@ -1037,6 +1056,7 @@ class DBHelper
             $where = ' WHERE `' . $mconf['primaryKey'] . '` = ?';
             $params = array($search);
         }
+
         return compact('where', 'params');
     }
 
@@ -1070,6 +1090,7 @@ class Validator
         $fileKey = ! empty($opt['fileKey']) ? $opt['fileKey'] : $key;
         if ( empty($_FILES[$fileKey]['name'])) {
             $input[$key] = $data->{$key};
+
             return;
         }
         // file upload
@@ -1107,7 +1128,7 @@ class Validator
         }
         $data->_new_files[] = $opt['dir'] . $source;
 
-        if ( $data->{$key}) { // 移除舊檔案
+        if ($data->{$key}) { // 移除舊檔案
             $file = $gd->processPath . $data->{$key};
             if (file_exists($file)) {
                 unlink($file);
@@ -1117,7 +1138,7 @@ class Validator
                 if ( !isset($oldinfo['filename'])) {
                     $oldinfo['filename'] = substr($oldinfo['basename'], 0, strlen($oldinfo['basename'])-strlen($oldinfo['extension'])-1);
                 }
-                foreach ($opt['thumbnails'] as $suffix => $sOpt)  {
+                foreach ($opt['thumbnails'] as $suffix => $sOpt) {
                     $file = $gd->processPath . $oldinfo['dirname'] . DIRECTORY_SEPARATOR . $oldinfo['filename'] . $suffix . '.' . $oldinfo['extension'];
                     if ( file_exists($file)) {
                         unlink($file);
@@ -1146,8 +1167,8 @@ class Validator
         $data->{$key} = $input[$key] = $source;
 
         if ( isset($opt['thumbnails'])) {
-            foreach ( $opt['thumbnails'] as $suffix => $sOpt) {
-                $sOpt = (array)$sOpt;
+            foreach ($opt['thumbnails'] as $suffix => $sOpt) {
+                $sOpt = (array) $sOpt;
                 if (!isset($sOpt['method'])) {
                     $method = empty($sOpt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
                 } else {
@@ -1173,6 +1194,7 @@ class Validator
         }
         if ( empty($_FILES[$fileKey]['tmp_name'])) {
             $input[$key] = $data->{$key};
+
             return;
         }
 
@@ -1207,7 +1229,7 @@ class Validator
             if ( ! is_array($data->{$key})) {
                 $data->_new_files[] = $opt['dir'] . DIRECTORY_SEPARATOR . $data->{$key};
             } else {
-                foreach ( $data->{$key}['successed'] as $info) {
+                foreach ($data->{$key}['successed'] as $info) {
                     $data->_new_files[] = $opt['dir'] . DIRECTORY_SEPARATOR . $info['rename'];
                 }
             }
@@ -1220,11 +1242,11 @@ class Validator
     {
         $errors = array();
 
-        if ( $input === NULL) {
+        if ($input === NULL) {
             $input = &$_POST;
         }
         // verify data
-        foreach ( $fields as $key  => $opt) {
+        foreach ($fields as $key  => $opt) {
             try {
 
                 $label = $opt['label'];
@@ -1234,7 +1256,7 @@ class Validator
                 }
 
                 // upload files
-                switch ( $opt['type']) {
+                switch ($opt['type']) {
                     case 'image':
                         self::__verifySaveImage($data, $key, $opt, $input);
                         break;
@@ -1246,18 +1268,18 @@ class Validator
                 }
 
                 // assign data
-                if ( 'boolean' === $opt['type']) {
-                    $data->{$key} = isset($input[$key]) ? (int)(boolean)$input[$key] : '0';
+                if ('boolean' === $opt['type']) {
+                    $data->{$key} = isset($input[$key]) ? (int) (boolean) $input[$key] : '0';
                     $is_empty = false;
-                } elseif ( 'multiple' === $opt['type']) {
+                } elseif ('multiple' === $opt['type']) {
                     $data->{$key} = isset($input[$key]) && is_array($input[$key]) ? $input[$key] : array();
                     $is_empty = empty($data->{$key});
                 } else {
                     $data->{$key} = isset($input[$key]) ? trim($input[$key]) : '';
                     $is_empty = $data->{$key} === '';
                 }
-                if ( ! $is_empty ) {
-                    switch  ($opt['type']) {
+                if (! $is_empty) {
+                    switch ($opt['type']) {
                         case 'date':
                         case 'datetime':
                             if ( ! ( $timestamp = strtotime($data->{$key}))) {
@@ -1265,7 +1287,7 @@ class Validator
                                         _e('%s: 非正確的時間格式'),
                                         '<strong>' . HtmlValueEncode($label) . '</strong>' ));
                             }
-                            if ( 'date' === $opt['type']) {
+                            if ('date' === $opt['type']) {
                                 $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
                                 $data->{$key} = date($format, $timestamp);
                             } else {
@@ -1283,7 +1305,7 @@ class Validator
                     if ( isset($opt['list'])) {
 
                         if ( is_array($data->{$key})) {
-                            foreach ( $data->{$key} as $k => $v) {
+                            foreach ($data->{$key} as $k => $v) {
                                 if ( ! isset($opt['list'][$v])) {
                                     unset($data->{$key}[$k]);
                                     unset($input[$key][$k]);
@@ -1335,7 +1357,7 @@ class Validator
         if ( !isset($opt['callbacks'])) {
             return;
         }
-        foreach ( $opt['callbacks'] as $ck => $func ) {
+        foreach ($opt['callbacks'] as $ck => $func) {
             if ( is_array($func)) {
                 $params = $func;
                 $func = $ck;
@@ -1346,7 +1368,7 @@ class Validator
             try {
                 if ( method_exists($data, $func)) { // $data->$func()
                     $data->{$key} = call_user_func_array(array($data, $func), $params);
-                } else if ( method_exists(__CLASS__, $func)) { // Validator::$func()
+                } elseif ( method_exists(__CLASS__, $func)) { // Validator::$func()
                     $data->{$key} = call_user_func_array(array(__CLASS__, $func), $params);
                 } else {
                     $data->{$key} = call_user_func_array($func, $params);
@@ -1361,6 +1383,7 @@ class Validator
         if ( '' === trim(strip_tags($value))) {
             throw new Exception(_e('文字必須填寫'));
         }
+
         return $value;
     }
     public function numeric($value)
@@ -1368,6 +1391,7 @@ class Validator
         if ( ! is_numeric($value)) {
             throw new Exception(_e('必須是數字'));
         }
+
         return $value;
     }
     public static function between($value, $min, $max)
@@ -1375,6 +1399,7 @@ class Validator
         if ( ($value < $min) || ($value > $max)) {
             throw new Exception(sprintf(_e('數字範圍為%s~%s'), $min, $max));
         }
+
         return $value;
     }
     public static function date($value, $format='yyyy/mm/dd', $forceYearLength=false)
@@ -1391,7 +1416,7 @@ class Validator
             }
         }
 
-        switch($format){
+        switch ($format) {
             case 'dd/mm/yy':
                 $pattern = "/^\b(0?[1-9]|[12][0-9]|3[01])[- \/.](0?[1-9]|1[012])[- \/.]{$yearFormat}\b$/";
                 break;
@@ -1415,15 +1440,17 @@ class Validator
         if (!preg_match($pattern, $value)) {
             throw new Exception( sprintf(__('日期格式不正確!請使用%s格式'), $format));
         }
+
         return $value;
     }
     public static function datetime($value)
     {
         $rs = strtotime($value);
 
-        if ($rs===false || $rs===-1){
+        if ($rs===false || $rs===-1) {
             throw new Exception(__('時間格式不正確'));
         }
+
         return $value;
     }
 
@@ -1432,12 +1459,13 @@ class Validator
         if ( ! self::_idNumber($value, $identityType)) {
             throw new Exception(__('請輸入有效的證件編號'));
         }
+
         return $value;
     }
 
     private static function _idNumber($value, $identityType='id')
     {
-        if ( 'passport' === $identityType ) {
+        if ('passport' === $identityType) {
             return strlen($value) <= 20;
         }
         $number = strtoupper($value);
@@ -1461,8 +1489,8 @@ class Validator
         $sum += floor($city / 10) + ($city % 10 * 9);
 
         // 計算性別加權
-        if ( !$isArcNumber ) {
-            $sum +=  (int)$number{1} * 8;
+        if (!$isArcNumber) {
+            $sum +=  (int) $number{1} * 8;
         } else {
             $gender = $cities[$number{1}];
             $sum += ($gender % 10 * 8);
@@ -1470,21 +1498,22 @@ class Validator
         }
 
         // 計算中間值的加權
-        for ( $i=2; $i<=8; $i++) {
-            $sum +=  (int)$number{$i} * (9-$i);
+        for ($i=2; $i<=8; $i++) {
+            $sum +=  (int) $number{$i} * (9-$i);
         }
 
         // 加上檢查碼
-        $sum += (int)$number{9};
+        $sum += (int) $number{9};
 
         return ($sum % 10 === 0);
     }
 
     public static function NullOrHasRecord($value, $model, $search=NULL)
     {
-        if ( NULL === $value) {
+        if (NULL === $value) {
             return $value;
         }
+
         return self::hasRecord($value, $model, $search);
     }
 
@@ -1501,7 +1530,7 @@ class Validator
         if ( is_object($search) && $search instanceof Search) {
             array_unshift($search->where, $mconf['primaryKey']);
             array_unshift($search->params, $value);
-        } elseif ( is_array($search) ){
+        } elseif ( is_array($search) ) {
             array_merge(array($mconf['primaryKey'] => $value), $search);
         } else {
             $search = $value;
@@ -1510,6 +1539,7 @@ class Validator
         if ( ! DBHelper::count($model, $search) ) {
             throw new Exception(__('資料不存在'));
         }
+
         return $value;
     }
     public static function hexColor($value)
@@ -1517,6 +1547,7 @@ class Validator
         if (!preg_match("/^#(?:[0-9a-fA-F]{3}){1,2}$/", $value)) {
             throw new Exception(__('請輸入 HEX 色碼如: #FFF 或 #FFFFFF'));
         }
+
         return $value;
     }
 }
@@ -1560,15 +1591,14 @@ class Urls
      **/
     private $_indexFile;
 
-
     /**
      * 建構式
      *
-     * @param string $urlBase 簡潔網址的起始位置
-     * @param string $paramName 網址路徑的 GET 參數名稱
+     * @param  string $urlBase   簡潔網址的起始位置
+     * @param  string $paramName 網址路徑的 GET 參數名稱
      * @return void
      */
-    function __construct($urlBase, $paramName='q')
+    public function __construct($urlBase, $paramName='q')
     {
         $this->_urlBase = rtrim($urlBase, '/') . '/';
         $this->_modRewriteEnabled = App::conf()->enable_rewrite && self::_isModRewriteEnabled();
@@ -1608,6 +1638,7 @@ class Urls
         if (function_exists('apache_get_modules')) {
             return in_array('mod_rewrite', apache_get_modules());
         }
+
         return (getenv('HTTP_MOD_REWRITE') === 'On');
     }
     /**
@@ -1622,8 +1653,8 @@ class Urls
     /**
      * 傳回指定部位的網址路徑
      *
-     * @param integer $index 網址路徑的部位，從0開始
-     * @param string $default 若指定的部分無值時，傳回此值
+     * @param  integer $index   網址路徑的部位，從0開始
+     * @param  string  $default 若指定的部分無值時，傳回此值
      * @return string
      **/
     public function segment($index, $default='')
@@ -1631,6 +1662,7 @@ class Urls
         if ( isset($this->_segments[$index]) && $this->_segments[$index] !== '') {
             return $this->_segments[$index];
         }
+
         return $default;
     }
     private function ___urltoIdReplacer($matches)
@@ -1639,6 +1671,7 @@ class Urls
         if (isset($this->tmpRouteParams[$paramName])) {
             return $this->tmpRouteParams[$paramName];
         }
+
         return App::route()->getDefault($paramName);
     }
     public function urltoId($routeId, $routeParams=null, $urlParams=null, $options=array( 'fullurl' => false, 'argSeparator' => '&amp;'))
@@ -1658,6 +1691,7 @@ class Urls
 
         if ('default' !== $routeId) {
             $url = str_replace(array('(/)?', '(', ')?', '\\'), '', $url);
+
             return $this->urlto($url, $urlParams, $options);
         }
 
@@ -1673,6 +1707,7 @@ class Urls
         if ( !isset($routeParams['controller']) && $url === $route->getDefault('controller')) {
             $url = '';
         }
+
         return $this->urlto($url, $urlParams, $options);
     }
     /**
@@ -1696,7 +1731,7 @@ class Urls
             $url = ($this->_queryStringPrefix ? $this->_queryStringPrefix . '/' : '') . $url;
         }
 
-        if ( $this->_modRewriteEnabled ) {
+        if ($this->_modRewriteEnabled) {
             $url = $this->_urlBase . $url;
             if ( !empty($urlParams)) {
                 $url .= '?' . http_build_query($urlParams, '', $argSeparator);
@@ -1708,26 +1743,27 @@ class Urls
                 $params = array_merge($urlParams, $params);
             }
             $url = http_build_query($params, '', $argSeparator);
-            if ( $url ) {
+            if ($url) {
                 $url = str_replace('%2F', '/', $url);
                 $url = $this->_urlBase . $this->_indexFile . '?' . $url;
             } else {
                 $url = $this->_urlBase;
             }
         }
-        if ( $fullurl ) {
+        if ($fullurl) {
             return get_domain_url() . $url;
         }
+
         return  $url;
     }
     /**
      * Redirect to an external URL with HTTP 302 header sent by default
      *
-     * @param string $routeuri URL of the redirect location
-     * @param bool $exit to end the application
-     * @param code $code HTTP status code to be sent with the header
-     * @param array $headerBefore Headers to be sent before header("Location: some_url_address");
-     * @param array $headerAfter Headers to be sent after header("Location: some_url_address");
+     * @param string $routeuri     URL of the redirect location
+     * @param bool   $exit         to end the application
+     * @param code   $code         HTTP status code to be sent with the header
+     * @param array  $headerBefore Headers to be sent before header("Location: some_url_address");
+     * @param array  $headerAfter  Headers to be sent after header("Location: some_url_address");
      */
     public function redirect($routeuri, $exit=true, $code=303, $headerBefore=NULL, $headerAfter=NULL)
     {
@@ -1750,7 +1786,7 @@ class Route
 
     public function __construct($routeConfig)
     {
-        if ( NULL === $routeConfig) {
+        if (NULL === $routeConfig) {
             $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'route.' . App::$id . '.php';
         } elseif (is_string($routeConfig)) {
             $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'route.' . $routeConfig . '.php';
@@ -1800,13 +1836,15 @@ class Route
                 $namedRoutes[$id] = $config;
             }
         }
+
         return $namedRoutes;
     }
     public function getNamedRoutes($key=NULL)
     {
-        if ( NULL === $key) {
+        if (NULL === $key) {
             return $this->_namedRoutes;
         }
+
         return !isset($this->_namedRoutes[$key]) ? NULL : $this->_namedRoutes[$key];
     }
     public function getDefault($key)
@@ -1825,7 +1863,7 @@ class Route
             // pass route parameters to $_REQUEST array
             unset($config['__id']);
             $_REQUEST = array_merge($_REQUEST, $config);
-            foreach ( $matches as $name => $value) {
+            foreach ($matches as $name => $value) {
                 if ( is_string($name)) {
                     if ('' === $value && isset($this->_defaultParams[$name])) {
                         $_REQUEST[$name] = $this->_defaultParams[$name];
@@ -1859,11 +1897,13 @@ class Route
     {
         if ('last' === $offset) {
             $length = sizeof($this->_history);
+
             return !$length ? array() : $this->_history[$length-1];
         }
         if ('first' === $offset) {
             return !isset($this->_history[0]) ? array() : $this->_history[0];
         }
+
         return $this->_history;
     }
 } // END class
@@ -1875,7 +1915,7 @@ class Acl
 
     public function __construct($aclConfig, $aclRole=NULL)
     {
-        if ( NULL === $aclConfig) {
+        if (NULL === $aclConfig) {
             $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'acl.' . App::$id . '.php';
         } elseif ( is_string($aclConfig)) {
             $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'acl.' . $aclConfig . '.php';
@@ -1903,6 +1943,7 @@ class Acl
                 unset($defaultRule[$key]);
             }
         }
+
         return array_merge($defaultRule, $rule);
     }
 
@@ -1911,7 +1952,7 @@ class Acl
         $rule = $this->_getRoleRules($this->_role);
 
         if ( ! $this->_isAccessible($rule)) {
-            if ( '404' === $rule['__failRoute']) {
+            if ('404' === $rule['__failRoute']) {
                 throw new NotFoundException(_e('頁面不存在'));
             }
 
@@ -1934,9 +1975,10 @@ class Acl
         unset($keys);
 
         $path = $_REQUEST['controller'] . '/' . $_REQUEST['action'];
-        if ( $denyPrior > $allowPrior ) {
+        if ($denyPrior > $allowPrior) {
             return ( !$this->_inList($path, $rule['deny']) && $this->_inList($path, $rule['allow']) );
         }
+
         return ( $this->_inList($path, $rule['allow']) || !$this->_inList($path, $rule['deny']));
     }
     private function _inList($path, $rule)
@@ -1952,6 +1994,7 @@ class Acl
                 }
             }
         }
+
         return false;
     }
     private function _matchRule($path, $rule)
@@ -1964,11 +2007,12 @@ class Acl
         }
 
         list($rController, $rAction) = explode('/', $rule);
-        if ( '*' !== $rAction) {
+        if ('*' !== $rAction) {
             return ($path === $rule);
         }
 
         list($controller) = explode('/', $path);
+
         return ($controller === $rController);
     }
 
@@ -2007,14 +2051,17 @@ class I18N
         $pofile = $config['folder'] . $config['domain'] . '.' . $config['locale'] . '.po';
         if ( ! is_readable($pofile)) {
             $this->translation = new NOOP_Translations;
+
             return false;
         }
         $po = new PO();
         if ( ! $po->import_from_file($pofile)) {
             $this->translation = new NOOP_Translations;
+
             return false;
         }
         $this->translation = $po;
+
         return true;
     }
 
@@ -2023,12 +2070,13 @@ class I18N
         if ($withEncoding) {
             return $this->config['locale'];
         }
+
         return current(explode('.', $this->config['locale']));
     }
 } // END class
 
-
-function __($message) {
+function __($message)
+{
     return $message;
 }
 /**
@@ -2040,9 +2088,10 @@ function __($message) {
  */
 function _n($msgid1, $msgid2, $n)
 {
-    if ( $n == 1) {
+    if ($n == 1) {
         return __($msgid1);
     }
+
     return __($msgid2);
 }
 function _e($message)

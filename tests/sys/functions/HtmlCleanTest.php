@@ -4,7 +4,6 @@ require_once __DIR__ . '/../../../sys/functions.php';
 require_once __DIR__ . '/../../../sys/core.php';
 require_once __DIR__ . '/../../config/config.php';
 
-
 class Sys_Functions_HtmlCleanTest extends PHPUnit_Framework_TestCase
 {
     public function testAttr_EnableID()
@@ -73,17 +72,17 @@ class Sys_Functions_HtmlCleanTest extends PHPUnit_Framework_TestCase
 <span style="font-size:16px;">在講出</span>來的，利
 <span style="font-family:\'lucida sans unicode\', \'lucida grande\', sans-serif;">比亞少數</span>僑民都撤掉了，</p>
 <h3>
-	我就要負責補足，省錢又有市場</h3>
+    我就要負責補足，省錢又有市場</h3>
 <p>
-	<tt>，我們一定</tt>充分支持</p>
+    <tt>，我們一定</tt>充分支持</p>
 <h3 style="color:#FF0000;">
-	且提供原民會及受災</h3>
+    且提供原民會及受災</h3>
 <ol><li>
-		的縣、鄉足夠的資</li>
+        的縣、鄉足夠的資</li>
 </ol><ul><li>
-		源，大體上都會截長補短</li>
+        源，大體上都會截長補短</li>
 </ul><blockquote>
-	<p>這裡面有兩個因素</p>
+    <p>這裡面有兩個因素</p>
 </blockquote>';
 
         $this->assertEquals($string, HtmlClean($string));
