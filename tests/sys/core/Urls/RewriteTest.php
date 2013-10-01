@@ -1,7 +1,7 @@
 <?php
 require_once 'PHPUnit/Framework/TestCase.php';
-require_once __DIR__ . '/../../../../sys/functions.php';
-require_once __DIR__ . '/../../../../sys/core.php';
+require_once __DIR__ . '/../../../../source/sys/functions.php';
+require_once __DIR__ . '/../../../../source/sys/core.php';
 require_once __DIR__ . '/../../../config/config.php';
 
 class Sys_Core_Urls_RewriteTest extends PHPUnit_Framework_TestCase

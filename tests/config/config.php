@@ -2,7 +2,7 @@
 error_reporting(E_ALL|E_STRICT);
 
 if ( phpversion() < 5.3) {
-    require_once dirname(__FILE__) . '/../sys/to_php53.php';
+    require_once dirname(__FILE__) . '/../../source/sys/to_php53.php';
 }
 
 $config = array(
@@ -33,7 +33,7 @@ $config = array(
     ),
 );
 
-define('ROOT_PATH', dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR);
+define('ROOT_PATH', dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR);
 define('SYS_PATH', ROOT_PATH . 'sys' . DIRECTORY_SEPARATOR);
 
 if ( ! defined('ROOT_URL')) {

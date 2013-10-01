@@ -1,7 +1,7 @@
 <?php
 require_once 'PHPUnit/Framework/TestCase.php';
-require_once __DIR__ . '/../../../sys/functions.php';
-require_once __DIR__ . '/../../../sys/core.php';
+require_once __DIR__ . '/../../../source/sys/functions.php';
+require_once __DIR__ . '/../../../source/sys/core.php';
 require_once __DIR__ . '/../../config/config.php';
 
 class Sys_Core_DBHelperTest extends PHPUnit_Framework_TestCase
@@ -25,11 +25,20 @@ class Sys_Core_DBHelperTest extends PHPUnit_Framework_TestCase
         $data = array();
         $this->assertNull(DBHelper::in($data));
 
-        $data = array('a' => 'A', 'c' => 'C', "'" => "''", '"' => '""', '`' => "``", 1, 2, 3);
+        $data = array(
+            'a' => 'A',     // string
+            "'" => "''",    // single quote
+            '"' => '""',    // double quote
+            '`' => "``",    // `
+            1, 2, 3         // number
+        );
         $this->assertEquals(" IN ("
-            . "'A','C',"
-            . "'\\'\\'','\\\"\\\"','``',"
-            . "'1','2','3')",
+            . "'A',"
+            . "'\\'\\'',"
+            . "'\\\"\\\"',"
+            . "'``',"
+            . "'1','2','3'"
+            . ")",
             DBHelper::in($data));
 
         $data = array(1,2,3);
