@@ -199,6 +199,14 @@ class App
             return new $class;
         }
     }
+    public static function loadVendor($class, $createObj=false, $appId=NULL)
+    {
+        require_once ROOT_PATH . 'vendor/' . $class . '.php';
+        if ($createObj) {
+            return new $class;
+        }
+    }
+
     public static function loadModel($model, $createObj=false, $appId=NULL)
     {
         require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/models/' . $model. '.php';
@@ -332,6 +340,13 @@ abstract class Module
 {
     protected $c;
 
+    /**
+     * Constructor
+     *
+     * @param Controller $controller
+     * @param array $members Each array item will be module member by it's key.
+     * @return void
+     */
     public function __construct($controller, $members=NULL)
     {
         $this->c = $controller;
@@ -342,6 +357,13 @@ abstract class Module
         }
     }
 }
+
+
+/*
+ * @method vold beforeVerify(array &$fields, array &$input=NULL, mixed $args=NULL)
+ * @method vold beforeSave(array &$fields, array &$input=NULL, mixed $args=NULL)
+ * @method vold afterSave(array &$fields, array &$input=NULL, mixed $args=NULL)
+ */
 abstract class Model
 {
     protected $_customId = FALSE;
@@ -350,12 +372,6 @@ abstract class Model
         'primaryKey' => 'id',
         'table' => null
     );
-
-    /*
-    public function beforeVerify(&$fields, &$input=NULL, $args) {}
-    public function beforeSave(&$fields, &$input, $args) {}
-    public function afterSave(&$fields, &$input, $args) {}
-    */
 
     public function verify(&$fields, &$input=NULL, $args=NULL)
     {
@@ -2040,7 +2056,7 @@ class I18N
             'domain'    => 'default',
         ), $config);
 
-        App::loadHelper('pomo' . DIRECTORY_SEPARATOR . 'po', false, 'common');
+        App::loadVendor('pomo' . DIRECTORY_SEPARATOR . 'po', false, 'common');
 
         $this->loadTextDomain($config);
     }

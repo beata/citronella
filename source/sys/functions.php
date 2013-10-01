@@ -104,8 +104,8 @@ function HtmlClean($value)
     static $purifier;
 
     if ( $purifier === null ) {
-        App::loadHelper('htmlpurifier/HTMLPurifier.standalone', false, 'common');
-        App::loadHelper('htmlpurifier/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
+        App::loadVendor('htmlpurifier/HTMLPurifier.standalone', false, 'common');
+        App::loadVendor('htmlpurifier/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
         $config = HTMLPurifier_Config::createDefault();
 
         $config->set('Output.FlashCompat', true);
