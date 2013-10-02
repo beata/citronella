@@ -34,7 +34,7 @@ class NotFoundException extends Exception
 }
 
 /**
- * App Class
+ * App Controlling and Resource loader.
  *
  * @package Core
  */
@@ -439,7 +439,7 @@ class App
 } // END class
 
 /**
- * Controller
+ * Request Controller
  *
  * @package Core
  */
@@ -575,8 +575,9 @@ abstract class Controller
      * Append page/window title
      *
      * @param string $title The string to be append to page/window title.
-     * @param array $sep Separators of page/window title.
-     *  `[pageTitleSep]` (string Default: '-'), `[windowTitleSep]` (string Default: ' | ')
+     * @param array $sep Separators of page/window title.<br />
+     *  * `[pageTitleSep]` (string Default: '-'), <br />
+     *  * `[windowTitleSep]` (string Default: ' | ')
      *
      * @return void
      */
@@ -590,7 +591,7 @@ abstract class Controller
 } // END class
 
 /**
- * BaseController
+ * Extended from Controller, has `api` and `_doSelectedAction` methods.
  *
  * @package Core
  */
@@ -664,7 +665,7 @@ abstract class BaseController extends Controller
 } // END class
 
 /**
- * Module
+ * Controller Module
  *
  * @package Core
  */
@@ -941,37 +942,114 @@ abstract class ViewModel
  */
 class View
 {
-    private $_appId;
-    private $_currentAddon;
-    private $_addons = array();
+    /**
+     * Stores the application id of this view, affects the loading path of view file.
+     *
+     * @var string
+     */
+    private $__appId;
 
+    /**
+     * Stores rendered outputs
+     *
+     * between `$this->startAddon($addonName)` and `$this->endAddon()`
+     *
+     * @var string[]
+     */
+    private $__addons = array();
+
+
+    /**
+     * Stores current addon name
+     *
+     * while processing `$this->startAddon($addonName)` and `$this->endAddon()`
+     *
+     * @var string
+     */
+    private $__currentAddonName;
+
+
+    /**
+     * Constructor
+     *
+     * @param string $appId The application id of this View. If not set, `App::$id` would be used.
+     * @return void
+     */
     public function __construct($appId)
     {
-        $this->_appId = $appId;
+        $this->__appId = ($appId ? $appId : App::$id);
     }
-    private function getDir($appId=NULL)
+
+    /**
+     * Returns view directory path of specific application id.
+     *
+     * @param string $appId The view's application id. If not set, `$this->__appId` would be used.
+     * @return string
+     */
+    private function __getDir($appId=NULL)
     {
-        return ROOT_PATH . ($appId ? $appId : $this->_appId) . '/views/';
+        return ROOT_PATH . ($appId ? $appId : $this->__appId) . '/views/';
     }
+
+    /**
+     * Returns contents of specific view file
+     *
+     * @param string $viewFile File name of the view file. The path starts from `{ROOT_PATH}{$appId}/views/`.
+     * @param string $appId The view file's application id. If not set, `$this->__appId` would be used.
+     * @return string
+     */
     public function content($viewFile, $appId=NULL)
     {
-        return file_get_contents( $this->getDir($appId) . $viewFile);
+        return file_get_contents( $this->__getDir($appId) . $viewFile);
     }
-    public function load($viewFile, $appId=NULL, $subViewData=array())
+
+    /**
+     * Load View File
+     *
+     * Extracts `$this->data` and `$viewData` as view variables before including view file.
+     *
+     * @param string $viewFile File name of the view file. The path starts from `{ROOT_PATH}{$appId}/views/`.
+     * @param string $appId The view file's application id. If not set, `$this->__appId` would be used.
+     * @param array $viewData Additional view data to be used in the view.
+     * @return void
+     */
+    public function load($viewFile, $appId=NULL, $viewData=array())
     {
         extract($this->data);
-        extract($subViewData);
+        extract($viewData);
         if ( false === strpos($viewFile, '.')) {
-            include $this->getDir($appId) . $viewFile . '.html';
+            include $this->__getDir($appId) . $viewFile . '.html';
         } else {
-            include $this->getDir($appId) . $viewFile;
+            include $this->__getDir($appId) . $viewFile;
         }
     }
+
+    /**
+     * Renders view with options
+     *
+     * * Layout would automatically set to false if current request is sent with `X-PJAX` header.
+     * * `{ROOT_PATH}{$appId}/views/{$layout}_functions.php` would be loaded automatically if it exists.
+     * * Where does string `{{content_html}}` take in place in the layout file, would be replaced with the rendered view content.
+     *
+     * @param string $viewFile File name of the view file. The path starts from `{ROOT_PATH}{$appId}/views/`.
+     * @param array $data View data, which would be stored as `$this->data` and extracted as variable in both view and layout file.
+     * @param array $options Options that controllers rendering behaviors.<br /><br />
+     * * `[appId]` `string`<br />
+     *   The view file's application id. If not set, `$this->__appId` would be used.<br /><br />
+     * * `[layout]` `boolean|string`<br />
+     k   File name of view layout, or set to false to disable layout rendering. The path starts from `{ROOT_PATH}{$appId}/views/`.<br /><br />
+     * * `[layoutAppId]` `string`<br />
+     *   The layout file's application id. If not set, `$this->__appId` would be used.<br /><br />
+     * * `[return]` `boolean`<br />
+     *   Returning the rendered string instead of printing
+     *
+     * @return void|string
+     */
     public function render($viewFile, $data=array(), $options=array())
     {
         $layout = 'layout';
-        $appId = App::$id;
-        $layoutAppId = App::$id;
+        $appId = NULL;
+        $layoutAppId = NULL;
         $return = false;
         extract($options, EXTR_IF_EXISTS);
 
@@ -981,8 +1059,8 @@ class View
 
         $this->data = $data;
 
-        if ( file_exists($this->getDir($layoutAppId) . $layout . '_functions.php')) {
-            include $this->getDir($layoutAppId) . $layout . '_functions.php';
+        if ( file_exists($this->__getDir($layoutAppId) . $layout . '_functions.php')) {
+            include $this->__getDir($layoutAppId) . $layout . '_functions.php';
         }
 
         ob_start();
@@ -1016,41 +1094,86 @@ class View
 
         return $layout_html[0] . $content_html . $layout_html[1];
     }
-    public function startAddon($hook)
+
+    /**
+     * Start an addon snippet.
+     *
+     * @param string $addonName The access key of addon.
+     * @return void
+     */
+    public function startAddon($addonName)
     {
-        $this->_currentAddon = $hook;
-        if ( ! isset($this->_addons[$hook])) {
-            $this->_addons[$hook] = array();
+        $this->__currentAddonName = $addonName;
+        if ( ! isset($this->__addons[$addonName])) {
+            $this->__addons[$addonName] = array();
         }
         ob_start();
     }
+
+    /**
+     * Close an addon snippet.
+     *
+     * @param string $addonName The access key of addon.
+     * @return void
+     */
     public function endAddon()
     {
-        $this->_addons[$this->_currentAddon][] = ob_get_contents();
+        $this->__addons[$this->__currentAddonName][] = ob_get_contents();
+        $this->__currentAddonName = NULL;
         ob_end_clean();
     }
-    public function showAddon($hook)
+
+    /**
+     * Prints snippets of specific addon.
+     *
+     * @param string $addonName The access key of addon.
+     * @return void
+     */
+    public function showAddon($addonName)
     {
-        if ( isset($this->_addons[$hook])) {
-            echo implode("\n", $this->_addons[$hook]);
+        if ( isset($this->_addons[$addonName])) {
+            echo implode("\n", $this->_addons[$addonName]);
         }
     }
-    public function hasAddon($hook)
+
+    /**
+     * Check if the specific addon exists.
+     *
+     * @param string $addonName The access key of addon.
+     * @return boolean
+     */
+    public function hasAddon($addonName)
     {
-        return isset($this->_addons[$hook]);
+        return isset($this->_addons[$addonName]);
     }
 } // END class
 
 /**
- * Search
+ * Search Helper
  *
  * @package Core
  */
 class Search
 {
+    /**
+     * Stores sql where conditions.
+     *
+     * @var string[]
+     */
     public $where = array();
+
+    /**
+     * Stores params for PDO::execute()
+     *
+     * @var array
+     */
     public $params = array();
 
+    /**
+     * Returns sql WHERE string from $this->where
+     *
+     * @return string
+     */
     public function sqlWhere()
     {
         return sizeof($this->where) ? ' WHERE ' . implode(' AND ', $this->where) : '';
