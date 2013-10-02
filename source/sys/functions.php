@@ -99,31 +99,43 @@ function HtmlValueEncode($value) {
  * @param string 要過濾的字串
  * @return string
  **/
-function HtmlClean($value)
+function HtmlClean($value, $key='default')
 {
-    static $purifier;
+    static $purifiers = array();
 
-    if ( $purifier === null ) {
-        App::loadVendor('htmlpurifier/HTMLPurifier.standalone', false, 'common');
-        App::loadVendor('htmlpurifier/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
-        $config = HTMLPurifier_Config::createDefault();
+    if (!isset($purifiers[$key])) {
+        $purifiers[$key] = __createHTMLPurifier($key);
+    }
 
-        $config->set('Output.FlashCompat', true);
-        $config->set('Filter.YouTube', true);
+    return $purifiers[$key]->purify($value);
+}
+function __createHTMLPurifier($key='default')
+{
+    if (!class_exists('HTMLPurifier')) {
+        App::loadVendor('ezyang/htmlpurifier/library/HTMLPurifier.standalone', false, 'common');
+        App::loadVendor('ezyang/htmlpurifier/library/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
+    }
 
-        $config->set('HTML.SafeObject', true);
-        $config->set('HTML.SafeEmbed', true);
-        $config->set('HTML.Trusted', true);
-        $config->set('HTML.FlashAllowFullScreen', true);
+    $appConf = App::config();
+    $settings = isset($appConf->htmlpurifier->{$key})
+        ? (array) $appConf->htmlpurifier->{$key}
+        : array();
 
-        $config->set('HTML.SafeIframe', true);
-        //$config->set('URI.SafeIframeRegexp', '%^(http:)?//(www.youtube(?:-nocookie)?.com/embed/|player.vimeo.com/video/)%'); //allow YouTube and Vimeo
-        $config->set('URI.SafeIframeRegexp', '%^(http(s)?:)?//%'); // allow to include any page
 
-        $config->set('Attr.EnableID', true);
-        $config->set('Attr.AllowedFrameTargets', array('_blank'));
+    $pConfig = HTMLPurifier_Config::createDefault();
+    $pConfig->loadArray(array_merge(array(
+        'Output.FlashCompat' => true,
+        'Filter.YouTube' => true,
 
-        $config->set('HTML.AllowedModules', array(
+        'HTML.SafeObject' => true,
+        'HTML.SafeEmbed' => true,
+        'HTML.Trusted' => true,
+        'HTML.FlashAllowFullScreen' => true,
+
+        'Attr.EnableID' => true,
+        'Attr.AllowedFrameTargets' => array('_blank'),
+
+        'HTML.AllowedModules' => array(
             'CommonAttributes', 'Text', 'Hypertext', 'List',
             'Presentation', 'Edit', 'Bdo', 'Tables', 'Image',
             'StyleAttribute',
@@ -132,23 +144,22 @@ function HtmlClean($value)
             'Object', 'Iframe', 'Target',
             // Sorta legacy, but present in strict:
             'Name',
-        ));
+        ),
 
-        $config->set('Cache.SerializerPath', ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier');
+        'Cache.SerializerPath' => ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier'
+    ), $settings);
 
-		$def = $config->getHTMLDefinition(true);
-		$def->addAttribute('table', 'align', 'Enum#left,center,right');
-        $def->addElement('u', 'Inline', 'Inline', 'Common');
-        $def->addElement('s', 'Inline', 'Inline', 'Common');
-        $def->addElement('strike', 'Inline', 'Inline', 'Common');
-        $def->addElement('font', 'Inline', 'Inline', 'Common');
-        $def->addAttribute('font', 'color', 'Color');
-        $def->addAttribute('font', 'face', 'Text');
-        $def->addAttribute('font', 'size', 'Text');
+    $def = $pConfig->getHTMLDefinition(true);
+    $def->addAttribute('table', 'align', 'Enum#left,center,right');
+    $def->addElement('u', 'Inline', 'Inline', 'Common');
+    $def->addElement('s', 'Inline', 'Inline', 'Common');
+    $def->addElement('strike', 'Inline', 'Inline', 'Common');
+    $def->addElement('font', 'Inline', 'Inline', 'Common');
+    $def->addAttribute('font', 'color', 'Color');
+    $def->addAttribute('font', 'face', 'Text');
+    $def->addAttribute('font', 'size', 'Text');
 
-        $purifier = new HTMLPurifier($config);
-    }
-    return $purifier->purify($value);
+    return new HTMLPurifier($pConfig);
 }
 /**
  * 將字串轉為 ASCII Code 以防止爬蟲蒐集email 地址

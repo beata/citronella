@@ -1,3 +1,0 @@
-#!/usr/bin/perl -p
-
-s/^(\s*)(define\("(.+?)".+\);)/$1if (!defined("$3")) { $2 }/;

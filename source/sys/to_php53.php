@@ -1,10 +1,16 @@
 <?php
-if (!function_exists('lcfirst')) {
-    function lcfirst( $str )  {
-        return (string)(strtolower(substr($str,0,1)).substr($str,1));
-    }
-}
+/**
+ * Add missing methods which upgradephp doesn't have.
+ *
+ * @author Beata Lin
+ * @package Core
+ */
+
 if (!function_exists('get_called_class')) {
+    /**
+     * @group 5.3
+     * @since 5.3
+     */
     function get_called_class()
     {
         static $cache = array();
@@ -28,11 +34,14 @@ if (!function_exists('get_called_class')) {
         return $class;
     }
 }
-/**
- * Workaround for PHP < 5.3.0
- */
+
 if(!function_exists('date_diff')) {
-    class DateInterval {
+    /**
+     * @group 5.3
+     * @since 5.3
+     */
+    class DateInterval
+    {
         public $y;
         public $m;
         public $d;
@@ -41,7 +50,8 @@ if(!function_exists('date_diff')) {
         public $s;
         public $invert;
 
-        public function format($format) {
+        public function format($format)
+        {
             $format = str_replace('%R%y', ($this->invert ? '-' : '+') . $this->y, $format);
             $format = str_replace('%R%m', ($this->invert ? '-' : '+') . $this->m, $format);
             $format = str_replace('%R%d', ($this->invert ? '-' : '+') . $this->d, $format);
@@ -60,7 +70,12 @@ if(!function_exists('date_diff')) {
         }
     }
 
-    function date_diff(DateTime $date1, DateTime $date2) {
+    /**
+     * @group 5.3
+     * @since 5.3
+     */
+    function date_diff(DateTime $date1, DateTime $date2)
+    {
         $diff = new DateInterval();
         if($date1 > $date2) {
             $tmp = $date1;

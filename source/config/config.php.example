@@ -8,7 +8,7 @@
 
 if ( phpversion() < 5.3) {
     require_once dirname(__FILE__) . '/../sys/to_php53.php';
-    require_once dirname(__FILE__) . '/../sys/upgradephp-18.1/upgrade.php';
+    require_once dirname(__FILE__) . '/../vendor/beata/upgradephp/upgrade.php';
 }
 
 $config = array(
@@ -48,6 +48,20 @@ $config = array(
     'ga' => array(
         'account' => '',    // 追蹤編號
         'domain' => ''      // 網域(optional)
+    ),
+
+    // htmlpurifier
+    'htmlpurifier' => array(
+        'default' => array(
+            'HTML.SafeIframe' => true,
+            // can include YouTube and Vimeo only
+            'URI.SafeIframeRegexp' => '%^(http:)?//(www.youtube(?:-nocookie)?.com/embed/|player.vimeo.com/video/)%',
+        ),
+        'admin' => array(
+            'HTML.SafeIframe' => true,
+            // can include any page
+            'URI.SafeIframeRegexp' => '%^(http(s)?:)?//%',
+        )
     )
 );
 

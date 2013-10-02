@@ -1,0 +1,7 @@
+{
+  "require": {
+    "php": ">=5.2",
+    "beata/upgradephp": "v18.1.0",
+    "ezyang/htmlpurifier": "v4.5"
+  }
+}
