@@ -386,8 +386,8 @@ class App
      * Path: `{ROOT_PATH}{$appId}/viewModels/{$viewModelName}.php`
      *
      * @param string $viewModelName The name of the view model to be loaded.
-     * @param boolean|array $createObj Whether or not to return the view model instance. If is array, each item will be the member attribute of the view model.
-     * @param string $baseUrl would be used for `Urls::urlto()`
+     * @param boolean|Model $createObj Whether or not to return the view model instance. If is Model, it would be set as ViewModel's model.
+     * @param string|array $baseUrl Parameter in ViewModel::__construct(). If is array, each item will be set as member attribute in the view model.
      * @param string $appId Load view model under `$appId` directory. If not set, current `App::$id` would be used.
      * @return void|ViewModel
      */
@@ -543,7 +543,7 @@ abstract class Controller
      * Path: `{ROOT_PATH}{$appId}/modules/{$module}.php`
      *
      * @param string $module The name of the module to be loaded.
-     * @param boolean|array $createObj Whether or not to return the view model instance. If is array, each item will be the member attribute of the view model.
+     * @param boolean|array $createObj Whether or not to return the view model instance. If is array, each item will be set as member attribute in the view model.
      * @param string $appId Load model under `$appId` directory. If not set, current `App::$id` would be used.
      * @return void|Module
      */
@@ -670,13 +670,18 @@ abstract class BaseController extends Controller
  */
 abstract class Module
 {
+    /**
+     * Stores Controller instance
+     *
+     * @var Controller
+     */
     protected $c;
 
     /**
      * Constructor
      *
-     * @param Controller $controller
-     * @param array $members Each array item will be module member by it's key.
+     * @param Controller $controller Would be set as Model's controller, which is `$model->c`
+     * @param array $members Each item will be set as $model's member attribute.
      * @return void
      */
     public function __construct($controller, $members=NULL)
@@ -895,9 +900,27 @@ abstract class Model
  */
 abstract class ViewModel
 {
+    /**
+     * Stores Model instance
+     *
+     * @var Model
+     */
     protected $m;
+
+    /**
+     * Base url of this ViewModel
+     *
+     * @var string
+     */
     protected $baseUrl;
 
+    /**
+     * Constructor
+     *
+     * @param Model $model Would be set as ViewModel's model, which is `$viewModel->m`
+     * @param string|array $baseUrl If is array, each item will be set as $viewModel's member attribute.
+     * @return void
+     */
     public function __construct($model, $baseUrl=NULL)
     {
         $this->m = $model;
