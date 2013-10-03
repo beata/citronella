@@ -8,8 +8,7 @@
 
 if (!function_exists('get_called_class')) {
     /**
-     * @group 5.3
-     * @since 5.3
+     * @group 5.3 back compatibility
      */
     function get_called_class()
     {
@@ -37,8 +36,7 @@ if (!function_exists('get_called_class')) {
 
 if(!function_exists('date_diff')) {
     /**
-     * @group 5.3
-     * @since 5.3
+     * @group 5.3 back compatibility
      */
     class DateInterval
     {
@@ -71,8 +69,7 @@ if(!function_exists('date_diff')) {
     }
 
     /**
-     * @group 5.3
-     * @since 5.3
+     * @group 5.3 back compatibility
      */
     function date_diff(DateTime $date1, DateTime $date2)
     {

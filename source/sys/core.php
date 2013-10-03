@@ -113,9 +113,9 @@ class App
     /**
      * Boot application and execute the controller action for http request.
      *
-     * @param  array  $routeConfig See Route::__construct() for more detail.
-     * @param  array  $aclConfig See Acl::__construct() for more detail.
-     * @param  string $aclRole See Acl::__construct() for more detail.
+     * @param  array  $routeConfig {@see Route} for more detail.
+     * @param  array  $aclConfig {@see Acl} for more detail.
+     * @param  string $aclRole {@see Acl} for more detail.
      * @return void
      */
     public static function run($routeConfig=NULL, $aclConfig=NULL, $aclRole='anonymous')
@@ -225,7 +225,7 @@ class App
      *
      * If Route instance exists, the instance will be reconfigure with `$routeConfig`
      *
-     * @param  array  $routeConfig See Route::__construct() for more detail.
+     * @param  array  $routeConfig {@see Route} for more detail.
      * @return Route
      */
     public static function route($routeConfig=NULL)
@@ -246,8 +246,8 @@ class App
      *
      * If Acl instance not exists, the instance will be created with `$aclConfig` and `$aclRole`
      *
-     * @param  array  $aclConfig See Acl::__construct() for more detail.
-     * @param  string $aclRole See Acl::__construct() for more detail.
+     * @param  array  $aclConfig {@see Acl} for more detail.
+     * @param  string $aclRole {@see Acl} for more detail.
      * @return Acl
      */
     public static function acl($aclConfig=NULL, $aclRole=NULL)
@@ -316,8 +316,8 @@ class App
      * Returns the specific Urls instance or create a new one.
      *
      * @param string $key The access key of the Urls instance.
-     * @param string $urlBase See Urls::__construct() for more detail.
-     * @param string $paramName See Urls::__construct() for more detail.
+     * @param string $urlBase {@see Urls} for more detail.
+     * @param string $paramName {@see Urls} for more detail.
      * @return Urls
      */
     public static function urls($key='primary', $urlBase=NULL, $paramName='q')
@@ -348,7 +348,7 @@ class App
      *
      * Or create a new I18N instance with `$config`
      *
-     * @param array $config See I18N::__construct() for more detail.
+     * @param array $config {@see I18N} for more detail.
      * @return I18N
      */
     public static function i18n($config=array())
@@ -698,6 +698,8 @@ abstract class Module
 
 /**
  * Model
+ *
+ * @TODO document
  *
  * @package Core
  *
@@ -1183,6 +1185,8 @@ class Search
 /**
  * DBHelper
  *
+ * @TODO document
+ *
  * @package Core
  */
 class DBHelper
@@ -1585,6 +1589,8 @@ class DBHelper
 
 /**
  * Validator
+ *
+ * @TODO document
  *
  * @package Core
  */
@@ -2087,95 +2093,138 @@ class Validator
 class Urls
 {
     /**
-     * 網址計算的基本位置 eg: /subfolder/
+     * Stores activation status of mod rewrite.
      *
-     * @var string
-     **/
-    private $_urlBase;
-    /**
-     * mod rewrite 是否已啟用
+     * If enabled, the generated url will look like `/subfolder/a/b/c`.
      *
      * @var string
      **/
     private $_modRewriteEnabled = null;
+
     /**
-     * 路徑的網址參數名稱
+     * The access key of uri string in $_GET array
      *
      * @var string
      **/
-    public $_paramName = 'q';
+    private $_paramName = 'q';
+
     /**
-     * 路徑陣列
+     * Stores the requested uri string (ex: $_GET['q']) with trailing slash stripped .
+     *
+     * @var string
+     */
+    private $_queryString;
+
+    /**
+     * Stores the required uri string in array format.
      *
      * @var array
      **/
     private $_segments;
-    private $_queryString;
-    /**
-     * route 的基本路徑(如用於語系切換)
-     *
-     * @var string
-     **/
-    private $_queryStringPrefix;
-    /**
-     * 產生連結時的檔案名稱 eg: index.php or keep it blank to use server default setting.
-     *
-     * @var string
-     **/
-    private $_indexFile;
 
     /**
-     * 建構式
+     * Stores the path that will be prepended to the generated url.
      *
-     * @param  string $urlBase   簡潔網址的起始位置
-     * @param  string $paramName 網址路徑的 GET 參數名稱
+     * e.g. With urlBase: `/subfolder/` => generates `/subfolder/?q=a/b/c`
+     *
+     * @var string
+     **/
+    private $_urlBase;
+
+    /**
+     * Stores the file name of the generated url.
+     *
+     * e.g With file name `app.php` => generates `app.php?q=a/b/c`
+     *
+     * @var string
+     **/
+    private $_fileName = '';
+
+    /**
+     * Stores the base segment of the generated url.
+     *
+     * e.g: With segment base `zh-tw` => generates `?q=zh-tw/a/b/c`
+     *
+     * @var string
+     **/
+    private $_segmentBase;
+
+    /**
+     * Constructor
+     *
+     * @param  string $urlBase   Set the path that will be prepended to the generated url.<br />
+     *                           e.g. `/subfolder/` => `/subfolder/?q=a/b/c`
+     * @param  string $paramName The access key of uri string in `$_GET` array
      * @return void
      */
     public function __construct($urlBase, $paramName='q')
     {
         $this->_urlBase = rtrim($urlBase, '/') . '/';
-        $this->_modRewriteEnabled = App::conf()->enable_rewrite && self::_isModRewriteEnabled();
+        $this->_modRewriteEnabled = App::conf()->enable_rewrite && self::__isModRewriteEnabled();
         $this->_paramName = $paramName;
 
         $this->_queryString = isset($_GET[$this->_paramName]) ? trim($_GET[$this->_paramName], '/') : '';
         $this->_segments = explode('/', $this->_queryString);
     }
-    public function setIndexFile($file)
-    {
-        $this->_indexFile = $file;
-    }
-    public function setQueryStringPrefix($prefix)
-    {
-        $this->_queryStringPrefix = $prefix;
-    }
-    public function getQueryStringPrefix($prefix)
-    {
-        return $this->_queryStringPrefix;
-    }
+
+    /**
+     * Get the segments array
+     *
+     * @return array
+     */
     public function getSegments()
     {
         return $this->_segments;
     }
 
+    /**
+     * Shift the segments array
+     *
+     * @return string The shifted segment
+     */
     public function shiftSegments()
     {
-        array_shift($this->_segments);
+        return array_shift($this->_segments);
     }
-    /**
-     * 偵測伺服器是否有啟用 mod rewrite
-     *
-     * @return boolean
-     */
-    private static function _isModRewriteEnabled()
-    {
-        if (function_exists('apache_get_modules')) {
-            return in_array('mod_rewrite', apache_get_modules());
-        }
 
-        return (getenv('HTTP_MOD_REWRITE') === 'On');
-    }
     /**
-     * 傳回網址的路由參數值
+     * Set the file name of the generated url.
+     *
+     * e.g With file name `app.php` => generates `app.php?q=a/b/c`
+     *
+     * @param string $name The file name.
+     * @return void
+     */
+    public function setFileName($name)
+    {
+        $this->_fileName = $name;
+    }
+
+    /**
+     * Set the base segment of the generated url.
+     *
+     * e.g: With segment base `zh-tw` => generates `?q=zh-tw/a/b/c`
+     *
+     * @param string $base The base segment.
+     * @return void
+     */
+    public function setSegmentBase($base)
+    {
+        $this->_segmentBase = $base;
+    }
+
+    /**
+     * Returns the base segment
+     *
+     * @return string
+     */
+    public function getSegmentBase()
+    {
+        return $this->_segmentBase;
+    }
+
+    /**
+     * Returns the requested uri string.
      *
      * @return string
      */
@@ -2183,11 +2232,26 @@ class Urls
     {
         return $this->_queryString;
     }
+
     /**
-     * 傳回指定部位的網址路徑
+     * Detects whether or not the server has enabled mod rewrite
      *
-     * @param  integer $index   網址路徑的部位，從0開始
-     * @param  string  $default 若指定的部分無值時，傳回此值
+     * @return boolean
+     */
+    private static function __isModRewriteEnabled()
+    {
+        if (function_exists('apache_get_modules')) {
+            return in_array('mod_rewrite', apache_get_modules());
+        }
+
+        return (getenv('HTTP_MOD_REWRITE') === 'On');
+    }
+
+    /**
+     * Returns the specific part of segments
+     *
+     * @param  integer $index   The segment position in the segments array.
+     * @param  string  $default If the segment is undefined, return `$default` instead.
      * @return string
      **/
     public function segment($index, $default='')
@@ -2198,6 +2262,12 @@ class Urls
 
         return $default;
     }
+
+    /**
+     * A callback function for `preg_replace_callback` that taken in place in Urls::urltoId()
+     *
+     * @return string
+     */
     private function ___urltoIdReplacer($matches)
     {
         $paramName = $matches['name'];
@@ -2207,12 +2277,31 @@ class Urls
 
         return App::route()->getDefault($paramName);
     }
-    public function urltoId($routeId, $routeParams=null, $urlParams=null, $options=array( 'fullurl' => false, 'argSeparator' => '&amp;'))
-    {
+
+    /**
+     * Generates url by predefined route id.
+     *
+     * @param string $routeId The route id.
+     * @param array $routeParams The route params corresponding to route pattern.
+     * @param array $urlParams Additional query parameters to be pass to the generated url.
+     * @param options $options Url options:<br /><br />
+     *
+     * * `fullurl` `boolean` `Default: false`<br />
+     *   Where or not to prepend domain info to the generated url.<br /><br />
+     *
+     * * `argSeparator` `string` `Default: '&nbsp;'`<br />
+     *   The separator used in PHP generated URLs to separate arguments.
+     *
+     * @return string
+     */
+    public function urltoId(
+        $routeId, $routeParams=NULL, $urlParams=NULL,
+        $options=array( 'fullurl' => false, 'argSeparator' => '&amp;')
+    ) {
         $route = App::route();
 
         if ( !$rule = $route->getNamedRoutes($routeId)) {
-            return null;
+            return NULL;
         }
 
         $this->tmpRouteParams = $routeParams;
@@ -2243,11 +2332,22 @@ class Urls
 
         return $this->urlto($url, $urlParams, $options);
     }
+
     /**
-     * 傳回網址
+     * Generates url.
+     *
+     * @param string $url The url string. e.g: `a/b/c` => `?q=a/b/c`
+     * @param array $urlParams Additional query parameters to be pass to the generated url.
+     * @param options $options Url options:<br /><br />
+     *
+     * * `fullurl` `boolean` `Default: false`<br />
+     *    Where or not to prepend domain info to the generated url.<br /><br />
+     *
+     * * `argSeparator` `string` `Default: '&nbsp;'`<br />
+     *    The separator used in PHP generated URLs to separate arguments.
      *
      * @return string
-     **/
+     */
     public function urlto( $url, $urlParams = null, $options=array( 'fullurl' => false, 'argSeparator' => '&amp;') )
     {
         $fullurl = false;
@@ -2259,9 +2359,9 @@ class Urls
         }
 
         if ( ! $url = trim($url, '/')) {
-            $url = $this->_queryStringPrefix;
+            $url = $this->_segmentBase;
         } else {
-            $url = ($this->_queryStringPrefix ? $this->_queryStringPrefix . '/' : '') . $url;
+            $url = ($this->_segmentBase ? $this->_segmentBase . '/' : '') . $url;
         }
 
         if ($this->_modRewriteEnabled) {
@@ -2278,7 +2378,7 @@ class Urls
             $url = http_build_query($params, '', $argSeparator);
             if ($url) {
                 $url = str_replace('%2F', '/', $url);
-                $url = $this->_urlBase . $this->_indexFile . '?' . $url;
+                $url = $this->_urlBase . $this->_fileName . '?' . $url;
             } else {
                 $url = $this->_urlBase;
             }
@@ -2289,11 +2389,12 @@ class Urls
 
         return  $url;
     }
+
     /**
-     * Redirect to an external URL with HTTP 302 header sent by default
+     * Redirect to an internal URL with HTTP 302 header sent by default
      *
      * @param string $routeuri     URL of the redirect location
-     * @param bool   $exit         to end the application
+     * @param bool   $exit         Where or not to end the application
      * @param code   $code         HTTP status code to be sent with the header
      * @param array  $headerBefore Headers to be sent before header("Location: some_url_address");
      * @param array  $headerAfter  Headers to be sent after header("Location: some_url_address");
@@ -2302,17 +2403,12 @@ class Urls
     {
         redirect($this->urlto($routeuri), $exit, $code, $headerBefore, $headerAfter);
     }
-    public function exceptionResponse($statusCode, $message)
-    {
-        header('HTTP/1.0 ' . $statusCode . ' ' . $message);
-        echo $statusCode, ' ', $message;
-        exit;
-    }
-
 } // END class
 
 /**
  * Route
+ *
+ * @TODO document
  *
  * @package Core
  */
@@ -2450,6 +2546,8 @@ class Route
 /**
  * Acl
  *
+ * @TODO document
+ *
  * @package Core
  */
 class Acl
@@ -2574,6 +2672,7 @@ class Acl
 /**
  * I18N
  *
+ * @TODO document
  * @package Core
  */
 class I18N
@@ -2624,26 +2723,58 @@ class I18N
     }
 } // END class
 
+/**
+ * Returns a translated string
+ *
+ * If the message hasn't been translated, it reutrns `$message`.
+ *
+ * @param string $message The messsage to be translated.
+ * @return string
+ */
 function __($message)
 {
     return $message;
 }
+
 /**
- * 單數、複數訊息
+ * Returns a translated string in singular/plural format based on $number
  *
- * @param string $msgid1 單數訊息
- * @param string $msgid2 複數訊息
+ * @param string $singular The singular string to be translated.
+ * @param string $plural The plural string to be translated.
+ * @param integer $number The number
  * @return string
  */
-function _n($msgid1, $msgid2, $n)
+function _n($singular, $plural, $number)
 {
-    if ($n == 1) {
-        return __($msgid1);
+    if ($number == 1) {
+        return __($singular);
     }
 
-    return __($msgid2);
+    return __($plural);
 }
+
+/**
+ * Returns a translated string in HTML encoded format.
+ *
+ * If the message hasn't been translated, it reutrns `$message`.
+ *
+ * @param string $message The messsage to be translated.
+ * @return string
+ */
 function _e($message)
 {
     return HtmlValueEncode(__($message));
+}
+
+/**
+ * Returns an HTML encoded translated string in singular/plural format based on $number
+ *
+ * @param string $singular The singular string to be translated.
+ * @param string $plural The plural string to be translated.
+ * @param integer $number The number
+ * @return string
+ */
+function _en($singular, $plural, $number)
+{
+    return HtmlValueEncode(_n($singular, $plural, $number));
 }
