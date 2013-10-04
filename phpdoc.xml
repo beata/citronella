@@ -6,6 +6,13 @@
   <transformer>
     <target>docs</target>
   </transformer>
+  <logging>
+    <level>warn</level>
+    <paths>
+      <default>logs/phpdoc.log</default>
+      <errors>logs/phpdoc.errors.log</errors>
+    </paths>
+  </logging>
   <files>
     <directory>source</directory>
     <ignore>source/vendor/*</ignore>
