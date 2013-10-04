@@ -1,6 +1,7 @@
 <?php
 App::loadHelper('File', false, 'common');
 
+class UploadException extends Exception {}
 class Upload
 {
     public $fieldName;
@@ -22,7 +23,7 @@ class Upload
     public function checkAll($idx=NULL)
     {
         if ( ! isset($_FILES[$this->fieldName])) {
-            throw new Exception(__('請上傳檔案'));
+            throw new UploadException(__('請上傳檔案'));
         }
 
         if (NULL === $idx) {
@@ -54,7 +55,7 @@ class Upload
     public function save()
     {
         if ( ! isset($_FILES[$this->fieldName])) {
-            throw new Exception(__('請上傳檔案'));
+            throw new UploadException(__('請上傳檔案'));
         }
 
         // single file upload
@@ -70,7 +71,7 @@ class Upload
             $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
 
             if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'], $filePath)) {
-                throw new Exception(__('上傳失敗！搬移檔案至目標資料夾時發生錯誤'));
+                throw new UploadException(__('上傳失敗！搬移檔案至目標資料夾時發生錯誤'));
             }
 
             return $newFileName;
@@ -94,7 +95,7 @@ class Upload
                 $filePath = $this->destDir . DIRECTORY_SEPARATOR . $newFileName;
 
                 if ( ! move_uploaded_file($_FILES[$this->fieldName]['tmp_name'][$idx], $filePath)) {
-                    throw new Exception(__('上傳失敗！搬移檔案至目標資料夾時發生錯誤'));
+                    throw new UploadException(__('上傳失敗！搬移檔案至目標資料夾時發生錯誤'));
                 }
                 $successed[] = array(
                     'name'    => strtolower($_FILES[$this->fieldName]['name'][$idx]),
@@ -102,7 +103,7 @@ class Upload
                     'index'   => $idx,
                 );
 
-            } catch ( Exception $ex ) {
+            } catch ( UploadException $ex ) {
                 $failed[] = array(
                     'name'    => strtolower($_FILES[$this->fieldName]['name'][$idx]),
                     'index'   => $idx,
@@ -116,16 +117,16 @@ class Upload
     public function checkSize($size)
     {
         if (! $size) {
-            throw new Exception(__('所上傳的檔案是空的，請另外上傳有內容的檔案'));
+            throw new UploadException(__('所上傳的檔案是空的，請另外上傳有內容的檔案'));
         }
         if ($this->maxSize && $this->maxSize < $size) {
-            throw new Exception(sprintf(__('只能上傳大小不超過%s的檔案'), File::formatBytes($this->maxSize)));
+            throw new UploadException(sprintf(__('只能上傳大小不超過%s的檔案'), File::formatBytes($this->maxSize)));
         }
     }
     public function checkExtension( $ext )
     {
         if ( in_array($ext, $this->denyFiles) ) {
-            throw new Exception(__('不接受的檔案格式'));
+            throw new UploadException(__('不接受的檔案格式'));
         }
     }
     public function checkType( $ext, $type)
@@ -133,14 +134,14 @@ class Upload
         $message = sprintf(__('請上傳 %s 格式的檔案'), implode(', ', array_keys($this->allowTypes)));
 
         if ( ! isset($this->allowTypes[$ext])) {
-            throw new Exception($message);
+            throw new UploadException($message);
         }
         foreach ($this->allowTypes as $ext => $mimes) {
             if ( in_array($type, $mimes)) {
                 return;
             }
         }
-        throw new Exception($message);
+        throw new UploadException($message);
     }
     /**
      * 產生不重複的新檔名
@@ -176,21 +177,21 @@ class Upload
             case UPLOAD_ERR_OK:
                 return;
             case UPLOAD_ERR_INI_SIZE:
-                throw new Exception(sprintf(__('上傳失敗！上傳的檔案大小超過伺服器限制的%s'), ini_get('upload_max_filesize')));
+                throw new UploadException(sprintf(__('上傳失敗！上傳的檔案大小超過伺服器限制的%s'), ini_get('upload_max_filesize')));
             case UPLOAD_ERR_FORM_SIZE:
-                throw new Exception(__('上傳失敗！上傳的檔案大小超過限定的大小'));
+                throw new UploadException(__('上傳失敗！上傳的檔案大小超過限定的大小'));
             case UPLOAD_ERR_PARTIAL:
-                throw new Exception(__('上傳失敗！檔案上傳不完全'));
+                throw new UploadException(__('上傳失敗！檔案上傳不完全'));
             case UPLOAD_ERR_NO_FILE:
-                throw new Exception(__('上傳失敗！並未上傳檔案'));
+                throw new UploadException(__('上傳失敗！並未上傳檔案'));
             case UPLOAD_ERR_NO_TMP_DIR:
-                throw new Exception(__('上傳失敗！找不到暫存資料夾'));
+                throw new UploadException(__('上傳失敗！找不到暫存資料夾'));
             case UPLOAD_ERR_CANT_WRITE:
-                throw new Exception(__('上傳失敗！無法寫入檔案'));
+                throw new UploadException(__('上傳失敗！無法寫入檔案'));
             case UPLOAD_ERR_EXTENSION:
-                throw new Exception(__('上傳失敗！不接受的副檔名'));
+                throw new UploadException(__('上傳失敗！不接受的副檔名'));
             default:
-                throw new Exception(__('上傳失敗！未知的錯誤'));
+                throw new UploadException(__('上傳失敗！未知的錯誤'));
         }
     }
     public function getFileType()

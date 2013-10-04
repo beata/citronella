@@ -1,6 +1,13 @@
 {
+  "repositories": [
+      {
+          "type": "vcs",
+          "url": "git@ubuntudev:beata/pomo.git"
+      }
+  ],
   "require": {
     "php": ">=5.2",
+    "beata/pomo": "dev-master",
     "beata/upgradephp": "v18.1.0",
     "ezyang/htmlpurifier": "v4.5"
   }

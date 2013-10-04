@@ -8,8 +8,6 @@
 
 
 /**
- * NotFoundException
- *
  * @package Core
  */
 class NotFoundException extends Exception
@@ -113,7 +111,7 @@ class App
     /**
      * Boot application and execute the controller action for http request.
      *
-     * @param  array  $routeConfig {@see Route} for more detail.
+     * @param  array  $routeConfig {@see Route::$__routes} for more detail.
      * @param  array  $aclConfig {@see Acl} for more detail.
      * @param  string $aclRole {@see Acl} for more detail.
      * @return void
@@ -225,7 +223,7 @@ class App
      *
      * If Route instance exists, the instance will be reconfigure with `$routeConfig`
      *
-     * @param  array  $routeConfig {@see Route} for more detail.
+     * @param  array  $routeConfig {@see Route::$__routes} for more detail.
      * @return Route
      */
     public static function route($routeConfig=NULL)
@@ -699,23 +697,63 @@ abstract class Module
 /**
  * Model
  *
- * @TODO document
- *
  * @package Core
  *
- * @method vold beforeVerify(array &$fields, array &$input=NULL, mixed $args=NULL)
- * @method vold beforeSave(array &$fields, array &$input=NULL, mixed $args=NULL)
- * @method vold afterSave(array &$fields, array &$input=NULL, mixed $args=NULL)
+ * @param array $rawValueFields An associative array of columns that won't be escaped during save.
+ *
+ * @method vold beforeVerify(array &$fields, array &$input=NULL, mixed $args=NULL) Executs before verify
+ * @method vold beforeSave(array &$fields, array &$input=NULL, mixed $args=NULL) Executs before save
+ * @method vold afterSave(array &$fields, array &$input=NULL, mixed $args=NULL) Executs after save
+ * @method array fields($for=NULL, $search=NULL) Returns validation settings for each field. {{@see Validator::verify()}}
  */
 abstract class Model
 {
-    protected $_customId = FALSE;
+    /**
+     * Force insertion while saving.
+     *
+     * @var boolean
+     */
+    protected $_forceInsert = FALSE;
 
+    /**
+     * Model Configuration
+     *
+     * * `[primaryKey]` `string` *Required* *Default: 'id'* The primary key column in the table.
+     *
+     * * `[table]` `string` *Required* *Default: NULL* The table name.
+     *
+     * * `[belongsTo]` `array` *Optional* Defines a set of relational tables.
+     *   * `[{TableAlias}]` `array` A relational table.
+     *      * `[model]` `string` *Required* The model name of the relational table.
+     *      * `[table]` `string` *Required* The name of the relational table.
+     *      * `[relKey]` `string` *Required* The column name in main table that represents **[foreignKey].
+     *      * `[foreignKey]` `string` *Required* The column in the relational table to be linked.
+     *
+     * * `[hasMany]` `array` *Default: undefined* Defines a set of relational tables.
+     *   * `[{TableAlias}]` `array` *Required* A relational table.
+     *      * `[model]` `string` *Required* The model name of the relational table.
+     *      * `[table]` `string` *Required* The name of the relational table.
+     *      * `[relKey]` `string` *Required* The column in main table to be linked.
+     *      * `[foreignKey]` `string` *Required* The column name in the relational table that represents **[relKey]**.
+     *      * `[whereLink] `string` *Optional* Define custom linking sql.
+     *      * `[where]` `string` *Optional* The where sql after linking sql.
+     *
+     * @var array
+     */
     protected $_config = array(
         'primaryKey' => 'id',
-        'table' => null
+        'table' => NULL
     );
 
+
+    /**
+     * Verifies input variables by fields settings.
+     *
+     * @param &array $fields The fields settings. {{@see Model::fields()}}
+     * @param &array $input The input data.
+     * @param mixed $args Any value that would be sent to `$this->beforeVerify()`
+     * @return void
+     */
     public function verify(&$fields, &$input=NULL, $args=NULL)
     {
         if ( method_exists($this, 'beforeVerify')) {
@@ -723,6 +761,23 @@ abstract class Model
         }
         Validator::verify($fields, $this, $input);
     }
+
+    /**
+     * Save input by fields settings.
+     *
+     * This method will firstly call verify method if need, then start saving process. Here's the execution order:
+     *
+     * 1. `verify()`, `beforeVerify()`, `Validator::verify()`
+     * 4. `beforeSave()`
+     * 5. `insert() / update()`
+     * 6. `afterSave()`
+     *
+     * @param &array $fields The fields settings. {{@see Model::fields()}}
+     * @param boolean $verify Whether or not to verify the input data.
+     * @param &array $input The input data.
+     * @param mixed $args Any value that would be used in the process.
+     * @return void
+     */
     public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
     {
         if (NULL === $input) {
@@ -737,7 +792,7 @@ abstract class Model
             $this->beforeSave($fields, $input, $args);
         }
 
-        if ( $this->_customId || ! $this->hasPrimaryKey()) {
+        if ( $this->_forceInsert || ! $this->hasPrimaryKey()) {
             if ( is_array($this->_config['primaryKey'])) {
                 foreach ($this->_config['primaryKey'] as $key) {
                     if ( ! isset($fields[$key]) && $this->{$key} !== NULL) {
@@ -754,15 +809,25 @@ abstract class Model
             $this->afterSave($fields, $input, $args);
         }
     }
-    public function insert($fields)
+
+    /**
+     * Insert a record for current model
+     *
+     * Insert a record with columns which are in `$fieldNames` and set models's primary key to the last inserted id.
+     *
+     * @see Model::$rawValueFields
+     * @param array $fieldNames Columns list that would be saved.
+     * @return void
+     */
+    public function insert($fieldNames)
     {
         $db = App::db();
 
         $params = array();
         if ( isset($this->rawValueFields)) {
-            $sql = DBHelper::toKeyInsertSql($this, $fields, $params, $this->rawValueFields);
+            $sql = DBHelper::toInsertSql($this, $fieldNames, $params, $this->rawValueFields);
         } else {
-            $sql = DBHelper::toKeyInsertSql($this, $fields, $params);
+            $sql = DBHelper::toInsertSql($this, $fieldNames, $params);
         }
         $stmt = $db->prepare('INSERT INTO `' . $this->_config['table'] . '` ' . $sql);
 
@@ -778,13 +843,22 @@ abstract class Model
             $this->id = $db->lastInsertId();
         }
     }
-    public function update($fields)
+
+    /**
+     * Update the record of current model
+     *
+     * Update a record with columns which are in `$fieldNames`.
+     *
+     * @param array $fieldNames Columns list that would be saved.
+     * @return void
+     */
+    public function update($fieldNames)
     {
         $params = array();
         if ( isset($this->rawValueFields)) {
-            $sql = DBHelper::toKeySetSql($this, $fields, $params, $this->rawValueFields);
+            $sql = DBHelper::toSetSql($this, $fieldNames, $params, $this->rawValueFields);
         } else {
-            $sql = DBHelper::toKeySetSql($this, $fields, $params);
+            $sql = DBHelper::toSetSql($this, $fieldNames, $params);
         }
         if ( ! is_array($this->_config['primaryKey'])) {
             $where = array( $this->_config['primaryKey'] => $this->{$this->_config['primaryKey']} );
@@ -799,6 +873,12 @@ abstract class Model
         DBHelper::bindArrayValue($stmt, $params);
         $stmt->execute();
     }
+
+    /**
+     * Delete the record of current model.
+     *
+     * @return void
+     */
     public function delete()
     {
         if ( ! is_array($this->_config['primaryKey'])) {
@@ -813,6 +893,13 @@ abstract class Model
         App::db()->exec('DELETE FROM `' . $this->_config['table'] . '` WHERE ' . DBHelper::where($where) );
     }
 
+    /**
+     * Check if the primary key of this model has been set.
+     *
+     * If the primary key is an array, all of the values soulde be set, or it'll return false.
+     *
+     * @return boolean
+     */
     public function hasPrimaryKey()
     {
         if ( ! is_array($this->_config['primaryKey'])) {
@@ -828,15 +915,28 @@ abstract class Model
     }
 
     // Model Config
-    public function getConfig($key=null)
+    /**
+     * Get a value from model configuration.
+     *
+     * @param string $key The access key of the value in the model configuration.
+     * @return mixed
+     */
+    public function getConfig($key=NULL)
     {
         if (NULL !== $key) {
-            return isset($this->_config[$key]) ? $this->_config[$key] : null;
+            return isset($this->_config[$key]) ? $this->_config[$key] : NULL;
         }
 
         return $this->_config;
     }
 
+    /**
+     * Set a model configuration.
+     *
+     * @param string|array $props The access key of the value in the configuration, or an associative array of values to be saved to configuration.
+     * @param string $values The value corresponding to the key. Only works when *$props* is a string.
+     * @return void
+     */
     public function setConfig($props, $value=NULL)
     {
         if ( !is_array($props)) {
@@ -850,6 +950,24 @@ abstract class Model
     }
 
     // select relational
+    /**
+     * Select relational data
+     *
+     * @param &array $select The select array from Search object {@see Search}
+     * @param array $config The [belongsTo] configuration of current Model {@see Model::$_config}
+     * @param string|array $columns If is a string, the returning column name whould be set as **'{TableAlias}_{column}'** in the **$select** array. If **$column** is an associative array, all acceptable formats are listed below, each column would be set as **'{TableAlias}_{column}'** in the sql statement:
+     *
+     * <pre>
+     * [TableAlias] => 'column'
+     * [TableAlias] => array('column1', 'column2', 'column3')
+     * [TableAlias] => array
+     *      ['column1'] => '(subquery of column1)',
+     *      ['column2'] => '(subquery of column2)',
+     *      ['column3'] => '(subquery of column3)'
+     * </pre>
+     *
+     * @return void
+     */
     public static function selectBelongsTo(&$select, $config, $columns='name')
     {
         foreach ($config as $alias => $rconf) {
@@ -867,6 +985,7 @@ abstract class Model
                         foreach ($columns[$alias] as $colName => $rawSelect) {
                             if ( is_numeric($colName)) {
                                 $colName = $rawSelect;
+                                $rawSelect = '`' . $rawSelect . '`';
                             }
                             $select[] = '(SELECT ' . $rawSelect . ' FROM `' . $rconf['table'] . '` b WHERE b.`' . $rconf['foreignKey'] . '` = a.`' . $rconf['relKey'] . '`) `' . $alias . '_' . $colName . '`';
                         }
@@ -878,6 +997,24 @@ abstract class Model
         }
     }
 
+    /**
+     * Select info from relational table.
+     *
+     * `'{TableAlias}_count'` would always be set to the *$select* array.
+     *
+     * @param &array $select The select array from Search object {@see Search}
+     * @param array $config The [hasMany] configuration of current Model {@see Model::$_config}
+     * @param array $columns An associative array of subqueries, each column would be set as **'{TableAlias}_{column}'** in the sql statement.
+     *
+     * <pre>
+     * [TableAlias] => array
+     *      ['column1'] => '(subquery of column1)',
+     *      ['column2'] => '(subquery of column2)',
+     *      ['column3'] => '(subquery of column3)'
+     * </pre>
+     *
+     * @return void
+     */
     public static function selectHasMany(&$select, $config, $columns=array())
     {
         foreach ($config as $alias => $rconf) {
@@ -1172,6 +1309,35 @@ class Search
     public $params = array();
 
     /**
+     * The column(s) for GROUP BY statement, only works on:
+     *
+     * * `DBHelper::getList()` when its $pager parameter hasn't been set.
+     * * `DBHelper::getOne()`
+     *
+     * @var string
+     */
+    public $groupBy;
+
+    /**
+     * The column(s) for ORDER BY statement, only works on:
+     *
+     * * `DBHelper::getList()` when its $pager parameter hasn't been set.
+     * * `DBHelper::getOne()`
+     *
+     * @var string
+     */
+    public $orderBy;
+
+    /**
+     * The number(s) for LIMIT statement, only works on:
+     *
+     * * `DBHelper::getList()` when its $pager parameter hasn't been set.
+     *
+     * @var string
+     */
+    public $limit;
+
+    /**
      * Returns sql WHERE string from $this->where
      *
      * @return string
@@ -1185,47 +1351,51 @@ class Search
 /**
  * DBHelper
  *
- * @TODO document
- *
  * @package Core
  */
 class DBHelper
 {
-    public static function isUniqIn($table, $field, $value, $id=NULL)
+    // SQL generator
+    /**
+     * Generates sql IN statement for values
+     *
+     * @param array $values An array of values of the `IN` statement, which would be escaped in the returning string.
+     * @param string $field The column to be prepended the returning string. e.g. `$field IN (...)`
+     * @return string
+     */
+    public static function in($values, $field='')
     {
-        $sql = 'SELECT COUNT(*) = 0 FROM ' . $table . ' WHERE ';
-        if ($id) {
-            $sql .= ' `id` != ? AND ';
-            $params[] = $id;
-        }
-        $sql .= ' `'.$field.'` = ?';
-        $params[] = $value;
-
-        $stmt = App::db()->prepare($sql);
-        $stmt->execute($params);
-
-        return (bool) $stmt->fetchColumn();
-    }
-    public static function clearNewFiles($data)
-    {
-        if ( empty($data->_new_files)) {
-            return;
-        }
-        foreach ($data->_new_files as $file) {
-            if ( file_exists($file)) {
-                unlink($file);
-            }
-        }
-    }
-    public static function in($array, $field='')
-    {
-        if ( sizeof($array) === 0) {
+        if ( sizeof($values) === 0) {
             return;
         }
 
-        return $field . ' IN (' . implode(',', array_map(array(App::db(), 'quote'), $array)) . ')';
+        return $field . ' IN (' . implode(',', array_map(array(App::db(), 'quote'), $values)) . ')';
     }
 
+    /**
+     * Generates OR where sql of columns.
+     *
+     * @param array $array An associative array of columns to be concatenated with OR. Each value in the array would be escaped in the returning string. Accepts:
+     * <pre>
+     * [column] => 'value',
+     * [whatever] array     # which would be concatenated with AND statement.
+     *     [column1] => 'value1',
+     *     [column2] => 'value2',
+     *     [column3] => 'value3'
+     * </pre>
+     * The example above produces:
+     * <pre>
+     * (
+     *  `column` = 'value'
+     *  OR (
+     *      `column1` => 'value1'
+     *      AND `column2` => 'value2'
+     *      AND `column3` => 'value3'
+     *     )
+     * )
+     * </pre>
+     * @return string
+     */
     public static function orWhere($array)
     {
         $db = App::db();
@@ -1249,8 +1419,28 @@ class DBHelper
             }
         }
 
-        return '(' . implode(' OR ', $sql) . ')';
+        return ' (' . implode(' OR ', $sql) . ')';
     }
+
+    /**
+     * Generates AND where sql of columns.
+     *
+     * @param array $array An associative array of columns to be concatenated with AND. Each value in the array would be escaped in the returning string. Example:
+     * <pre>
+     *  [column1] => 'value1',
+     *  [column2] => 'value2',
+     *  [column3] => 'value3'
+     * </pre>
+     * The example above produces:
+     * <pre>
+     * (
+     *  `column1` => 'value1'
+     *  AND `column2` => 'value2'
+     *  AND `column3` => 'value3'
+     * )
+     * </pre>
+     * @return string
+     */
     public static function where($array)
     {
         $db = App::db();
@@ -1261,22 +1451,17 @@ class DBHelper
 
         return implode(' AND ', $sql);
     }
-    public static function toSetSql($data, $fields, &$params, $rawValueFields=NULL)
-    {
-        $sql = array();
-        foreach ($fields as $field) {
-            $sql[] = '`'.$field.'` = ?';
-            $params[] = $data->{$field};
-        }
-        if ( ! empty($rawValueFields)) {
-            foreach ($rawValueFields as $field => $value) {
-                $sql[] = '`'.$field.'` = ' . $value;
-            }
-        }
 
-        return implode(',', $sql);
-    }
-    public static function toKeySetSql($data, $fields, &$params, $rawValueFields=NULL)
+    /**
+     * Generates SET sql for columns.
+     *
+     * @param object $data Any object.
+     * @param array $fields An array of column names.
+     * @param &array $params A reference of the parameters array for `PDO::execute()`
+     * @param array $rawValueFields An associative array of columns that won't be escaped.
+     * @return string
+     */
+    public static function toSetSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $sql = array();
         foreach ($fields as $field) {
@@ -1291,24 +1476,17 @@ class DBHelper
 
         return implode(',', $sql);
     }
-    public static function toInsertSql($data, $fields, &$params, $rawValueFields=NULL)
-    {
-        $columns = $values = array();
-        foreach ($fields as $field) {
-            $columns[] = $field;
-            $values[] = '?';
-            $params[] = $data->{$field};
-        }
-        if ( ! empty($rawValueFields)) {
-            foreach ($rawValueFields as $field => $value) {
-                $columns[] = $field;
-                $values[] = $value;
-            }
-        }
 
-        return '(`'.implode('`,`', $columns).'`) VALUES ('.implode(',', $values).')';
-    }
-    public static function toKeyInsertSql($data, $fields, &$params, $rawValueFields=NULL)
+    /**
+     * Generates INSERT sql for columns.
+     *
+     * @param object $data  Any object.
+     * @param array $fields An array of column names.
+     * @param &array $params A reference of the parameters array for `PDO::execute()`
+     * @param array $rawValueFields An associative array of columns that won't be escaped.
+     * @return string
+     */
+    public static function toInsertSql($data, $fields, &$params, $rawValueFields=NULL)
     {
         $columns = $values = array();
         foreach ($fields as $field) {
@@ -1325,116 +1503,60 @@ class DBHelper
 
         return '(`'.implode('`,`', $columns).'`) VALUES ('.implode(',', $values).')';
     }
+
+
+    // PDO Helpers
     /**
-     * @param string $req       : the query on which link the values
-     * @param array  $array     : associative array containing the values to bind
-     * @param array  $typeArray : associative array with the desired value for its corresponding key in $array
-     * */
-    public static function bindArrayValue($req, $array, $typeArray = false)
+     * Binds key-value pairs array via PDOStatement::bindValue()
+     *
+     * @param PDOStatement $stmt The query on which link the values
+     * @param array $array An associative array containing the values to bind
+     * @param array $typeArray An associative array with the desired value for its corresponding key in $array
+     * @return void
+     */
+    public static function bindArrayValue(PDOStatement $stmt, $array, $typeArray = false)
     {
-        if (is_object($req) && ($req instanceof PDOStatement)) {
-            foreach ($array as $key => $value) {
-                if($typeArray)
-                    $req->bindValue("$key",$value,(isset($typeArray[$key])?$typeArray[$key]:PDO::PARAM_STR));
-                else {
-                    if(is_int($value))
-                        $param = PDO::PARAM_INT;
-                    elseif(is_bool($value))
-                        $param = PDO::PARAM_BOOL;
-                    elseif(is_null($value))
-                        $param = PDO::PARAM_NULL;
-                    elseif(is_string($value))
-                        $param = PDO::PARAM_STR;
-                    else
-                        $param = FALSE;
-
-                    $req->bindValue($key,$value,$param);
-                }
-            }
-        }
-    }
-    public static function deleteColumnFile($options)
-    {
-        /* Options
-         * [columns]  array
-         * [table]    string
-         * [dir]      string
-         * [where]    string
-         * [params]   array optional
-         * [suffixes] array optional
-         */
-        extract($options);
-
-        $columns = $options['columns'];
-
-        if ( empty($options['params'])) {
-            $stmt = App::db()->query('SELECT `' . implode('`,`', $columns) . '` FROM `' . $options['table'] . '` a WHERE ' . $options['where']);
-        } else {
-            $stmt = App::db()->prepare('SELECT `' . implode('`,`', $columns) . '` FROM `' . $options['table'] . '` a WHERE ' . $options['where']);
-            $stmt->execute($options['params']);
-        }
-        if ( ! $stmt->rowCount()) {
-            return;
-        }
-        while ( $item = $stmt->fetchObject()) {
-            foreach ($columns as $column) {
-                $delFileOpts = array(
-                    'model' => $item,
-                    'column' => $column,
-                    'dir' => $dir,
-                );
-                if ( isset($options['suffixes'][$column])) {
-                    $delFileOpts['suffixes'] = $options['suffixes'][$column];
-                }
-                self::deleteFile($delFileOpts);
+        foreach ($array as $key => $value) {
+            if ($typeArray) {
+                $stmt->bindValue($key, $value, (isset($typeArray[$key])?$typeArray[$key]:PDO::PARAM_STR) );
+            } else {
+                $stmt->bindValue($key, $value, self::PDOValueType($value));
             }
         }
     }
 
-    public static function deleteFile($options)
+    /**
+     * Detects the PDO value type of a specific value
+     *
+     * @param mixed $value Any value to be detected.
+     * @return integer|false Returns a corresponding PDO constant: `PDO::PARAM_*`
+     */
+    public static function PDOValueType($value)
     {
-        /* Options
-         * [model]    Model
-         * [column]   string
-         * [dir]      string
-         * [suffixes] array
-         */
-        extract($options);
-
-        if (! $model->{$column}) {
-            return;
+        if(is_int($value)) {
+            return PDO::PARAM_INT;
         }
-        if ( file_exists($dir . $model->{$column})) {
-            unlink($dir . $model->{$column});
+        if(is_bool($value)) {
+            return PDO::PARAM_BOOL;
         }
-        if ( isset($options['suffixes'])) {
-            $info = pathinfo($model->{$column});
-            $fdir = '';
-            if ('.' !== $info['dirname']) {
-                $fdir = $info['dirname'] . DIRECTORY_SEPARATOR;
-            }
-            foreach ($options['suffixes'] as $suffix) {
-                $filename = $fdir . $info['filename'] . $suffix . (isset($info['extension']) ? '.' . $info['extension'] : '');
-                if ( file_exists($dir . $filename)) {
-                    unlink($dir . $filename);
-                }
-            }
+        if(is_null($value)) {
+            return PDO::PARAM_NULL;
         }
+        if(is_string($value)) {
+            return PDO::PARAM_STR;
+        }
+        return FALSE;
     }
 
-    public static function splitCommaList($str)
-    {
-        if ( is_array($str)) {
-            return $str;
-        }
-        if (NULL === $str || '' === $str) {
-            return array();
-        }
-        $array = explode(',', $str);
-
-        return array_combine($array, $array);
-    }
-
+    /**
+     * Returning an associative array in key-value pairs with the array key in specific column.
+     *
+     * @param PDOStatement $stmt The PDOStatement
+     * @param string $keyColumn The column to be used as the index in the returning array.
+     * @param null|string $displayColumn The column to be used as the value in the returning array. If not set, the data object will be used.
+     * @param string $className The class name of the data object. Only works when `$displayColumn` has not been set.
+     * @return array
+     */
     public static function fetchKeyedList(PDOStatement $stmt, $keyColumn='id', $displayColumn=NULL, $className='stdClass')
     {
         $list = array();
@@ -1452,51 +1574,50 @@ class DBHelper
         return $list;
     }
 
-    // Table Operations
 
-    public static function deleteAll($model, $ids)
+    // Queries
+    /**
+     * Check if "$field=$value" is the only record in the database.
+     *
+     * @param string $table The table to be checked
+     * @param string $field
+     * @param string $value
+     * @param string|integer|array $ignoreId If has duplicated record, ignore if the record matches $ignoreId. `$ignoreId` could be string, integer or an array of where conditions. {@see DBHelper::where()}
+     * @return boolean
+     */
+    public static function isUniqIn($table, $field, $value, $ignoreId=NULL)
     {
-        $model = new $model;
-        $mconf = $model->getConfig();
-
-        if ( is_object($ids) && $ids instanceof Search ) {
-            $search = $ids;
-            $where = $search->sqlWhere();
-            $stmt = App::db()->prepare('DELETE FROM `' . $mconf['table'] . '` ' . $where);
-            $stmt->execute($search->params);
-        } else {
-            $where = 'WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids);
-            App::db()->exec('DELETE FROM `' . $mconf['table'] . '` ' . $where);
+        $sql = 'SELECT COUNT(*) = 0 FROM ' . $table . ' WHERE ';
+        if (NULL !== $ignoreId) {
+            if (!is_array($ignoreId)) {
+                $sql .= ' `id` != ? AND ';
+                $params[] = $ignoreId;
+            } else {
+                $sql .= '!(' . self::where($ignoreId) . ')';
+            }
         }
-    }
-    public static function updateAll($model, $data, $ids, $rawValueFields=NULL)
-    {
-        $model = new $model;
-        $mconf = $model->getConfig();
+        $sql .= ' `'.$field.'` = ?';
+        $params[] = $value;
 
-        $params = array();
-
-        $fields = array_keys($data);
-        $data = (object) $data;
-        $sql = DBHelper::toKeySetSql($data, $fields, $params, $rawValueFields);
-        $stmt = App::db()->prepare('UPDATE `' . $mconf['table'] . '` SET ' . $sql . ' WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
-        $stmt->execute($params);
-    }
-
-    public static function count($model, $search, $countWith='*')
-    {
-        $where = $params = NULL;
-        extract(self::translateModelSearchArg($model, $search));
-
-        $model = new $model;
-        $mconf = $model->getConfig();
-
-        $stmt = App::db()->prepare('SELECT COUNT(' . $countWith . ') `counts` FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $stmt = App::db()->prepare($sql);
         $stmt->execute($params);
 
-        return $stmt->fetchColumn();
+        return (bool) $stmt->fetchColumn();
     }
 
+
+    // Model Queries
+    /**
+     * Query the database for a list and return the PDOStatement.
+     *
+     * If neither `$pager` and `$search->orderBy` has been set, the result will be sorted by model's primary key.
+     *
+     * @param string $model The class name of the model
+     * @param array|integer|string|Search $search A Search object, or an array of WHERE conditions, or the value of primary key.
+     * @param Pagination $pager The Pagination instance
+     * @param string $for This argument will be passed to `Model::select()` to select columns from table.
+     * @return PDOStatement
+     */
     public static function getList($model, $search=NULL, Pagination $pager=NULL, $for='list')
     {
         $where = $params = NULL;
@@ -1530,6 +1651,15 @@ class DBHelper
         return $stmt;
     }
 
+    /**
+     * Query the database for one result and return the model instance.
+     *
+     * @param string $model The class name of the model
+     * @param array|integer|string|Search $search A Search object or an array of WHERE conditions or the value of primary key.
+     * @param string $for This argument will be passed to `Model::select()` to select columns from table.
+     * @param Model $fetchIntoObject If passed, this object will be updated with the result.
+     * @return PDOStatement
+     */
     public static function getOne($model, $search, $for=NULL, $fetchIntoObject=NULL)
     {
         $where = $params = NULL;
@@ -1561,13 +1691,97 @@ class DBHelper
         return $stmt->fetchObject(get_class($model));
     }
 
-    public static function getFields($model, $for=null)
+    /**
+     * Counts records of the specific model
+     *
+     * @param string $model The class name of the model
+     * @param array|integer|string|Search $search A Search object or an array of WHERE conditions or the value of primary key.
+     * @param string $countWith The sql inside sql count function, default is `*`, which produces `COUNT(*) as counts`
+     * @return integer
+     */
+    public static function count($model, $search, $countWith='*')
+    {
+        $where = $params = NULL;
+        extract(self::translateModelSearchArg($model, $search));
+
+        $model = new $model;
+        $mconf = $model->getConfig();
+
+        $stmt = App::db()->prepare('SELECT COUNT(' . $countWith . ') `counts` FROM `' . $mconf['table'] . '` a ' . $where . ' LIMIT 1');
+        $stmt->execute($params);
+
+        return $stmt->fetchColumn();
+    }
+
+    /**
+     * Delete records of the specific model
+     *
+     * @param string $model The class name of the model
+     * @param array|Search $ids An array of primary keys or a Search object.
+     * @return void
+     */
+    public static function deleteAll($model, $ids)
     {
         $model = new $model;
+        $mconf = $model->getConfig();
 
-        return $model->fields($for);
+        if ( is_object($ids) && $ids instanceof Search ) {
+            $search = $ids;
+            $where = $search->sqlWhere();
+            $stmt = App::db()->prepare('DELETE FROM `' . $mconf['table'] . '` ' . $where);
+            $stmt->execute($search->params);
+        } else {
+            $where = 'WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids);
+            App::db()->exec('DELETE FROM `' . $mconf['table'] . '` ' . $where);
+        }
     }
-    public static function translateModelSearchArg($model, $search)
+
+    /**
+     * Update records of the specific model
+     *
+     * @param string $model The class name of the model
+     * @param array $data An associative array of the data to be saved.
+     * @param array $ids An array of primary keys to be updated.
+     * @param array $rawValueFields An associative array of columns that won't be escaped.
+     * @return void
+     */
+    public static function updateAll($model, $data, $ids, $rawValueFields=NULL)
+    {
+        $model = new $model;
+        $mconf = $model->getConfig();
+
+        $params = array();
+
+        $fields = array_keys($data);
+        $data = (object) $data;
+        $sql = DBHelper::toSetSql($data, $fields, $params, $rawValueFields);
+        $stmt = App::db()->prepare('UPDATE `' . $mconf['table'] . '` SET ' . $sql . ' WHERE `' . $mconf['primaryKey'] . '` ' . DBHelper::in($ids));
+        $stmt->execute($params);
+    }
+
+
+    // Model Helpers
+    /**
+     * Returns the field settings of a model
+     *
+     * @param string $model The class name of the model
+     * @param string $for Will be passed to `Model::fields()` as the first argument.
+     * @param Search $search Will be passed to `Model::fields()` as the second argument.
+     * @return array
+     */
+    public static function modelFields($model, $for=NULL, $search=NULL)
+    {
+        $model = new $model;
+        return $model->fields($for, $search);
+    }
+    /**
+     * Translate search argument to sql statement.
+     *
+     * @param string $model The class name of the model
+     * @param array|integer|string|Search $search A Search object or an array of WHERE conditions or the value of primary key.
+     * @return array
+     */
+    protected static function translateModelSearchArg($model, $search)
     {
         if ( is_object($search) && $search instanceof Search ) {
             $where = $search->sqlWhere();
@@ -1585,18 +1799,270 @@ class DBHelper
         return compact('where', 'params');
     }
 
+
+    // Filesystem
+    /**
+     * Delete new files of the data
+     *
+     * @param stdclass $data Can be any object that has `_new_files` property, which holds file pathes to be deleted.
+     * @return void
+     */
+    public static function clearNewFiles($data)
+    {
+        if ( empty($data->_new_files)) {
+            return;
+        }
+        foreach ($data->_new_files as $file) {
+            if ( file_exists($file)) {
+                unlink($file);
+            }
+        }
+        $data->_new_files = array();
+    }
+
+    /**
+     * Fetch file names from database and then delete these files.
+     *
+     * @param array $options
+     * <pre>
+     *  [columns]  array     An array of column names which stores file pathes.
+     *  [table]    string    The name of the table to be checked.
+     *  [dir]      string    The directory that stores files.
+     *  [where]    string    where conditions sql
+     *  [params]   array optional The array of parameters to be used in `PDO::execute()`
+     *  [suffixes] array optional Suffixes of files names:
+     *      [column] array   An array of suffixes which appends to file name.
+     * </pre>
+     * @return void
+     */
+    public static function deleteColumnFile($options)
+    {
+        extract($options);
+
+        $columns = $options['columns'];
+
+        $sql = 'SELECT `' . implode('`,`', $columns) . '` FROM `' . $options['table'] . '` a WHERE ' . $options['where'];
+        if ( empty($options['params'])) {
+            $stmt = App::db()->query($sql);
+        } else {
+            $stmt = App::db()->prepare($sql);
+            $stmt->execute($options['params']);
+        }
+        if ( ! $stmt->rowCount()) {
+            return;
+        }
+        while ( $item = $stmt->fetchObject()) {
+            foreach ($columns as $column) {
+                $delFileOpts = array(
+                    'data' => $item,
+                    'column' => $column,
+                    'dir' => $dir,
+                );
+                if ( isset($options['suffixes'][$column])) {
+                    $delFileOpts['suffixes'] = $options['suffixes'][$column];
+                }
+                self::deleteFile($delFileOpts);
+            }
+        }
+    }
+
+    /**
+     * Delete a set of files
+     *
+     * @param array $options
+     * <pre>
+     * [data]     object    Any object
+     * [column]   string    The property that stores file name in the data object
+     * [dir]      string    The directory that stores files.
+     * [suffixes] array     An array of suffixes that appends to the file name.
+     * </pre>
+     * @return void
+     */
+    public static function deleteFile($options)
+    {
+        extract($options);
+
+        if (! $data->{$column}) {
+            return;
+        }
+        if ( file_exists($dir . $data->{$column})) {
+            unlink($dir . $data->{$column});
+        }
+        if ( isset($options['suffixes'])) {
+            $info = pathinfo($data->{$column});
+            if ( !isset($info['filename'])) { // < php5.2.0
+                $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
+            }
+
+            $fdir = '';
+            if ('.' !== $info['dirname']) {
+                $fdir = $info['dirname'] . DIRECTORY_SEPARATOR;
+            }
+
+            foreach ($options['suffixes'] as $suffix) {
+                $filename = $fdir . $info['filename'] . $suffix . (isset($info['extension']) ? '.' . $info['extension'] : '');
+                if ( file_exists($dir . $filename)) {
+                    unlink($dir . $filename);
+                }
+            }
+        }
+    }
+
+
+    // Misc
+    /**
+     * Converts a comma separated string into an associative array.
+     *
+     * @param string $string A comma separated string.
+     * @return array
+     */
+    public static function splitCommaList($string)
+    {
+        if ( is_array($string)) {
+            return $string;
+        }
+        if (NULL === $string || '' === $string) {
+            return array();
+        }
+        $array = explode(',', $string);
+
+        return array_combine($array, $array);
+    }
+
 } // END class
 
+
+/**
+ * @package Core
+ */
+class ValidatorException extends Exception {}
 /**
  * Validator
- *
- * @TODO document
  *
  * @package Core
  */
 class Validator
 {
     /**
+     * @TODO
+     */
+    public static function verify($fields, $data, &$input=NULL)
+    {
+        $errors = array();
+
+        if ($input === NULL) {
+            $input = &$_POST;
+        }
+        // verify data
+        foreach ($fields as $key  => $opt) {
+            try {
+
+                $label = $opt['label'];
+
+                if ( ! isset($opt['type'])) {
+                    $opt['type'] = null;
+                }
+
+                // upload files
+                switch ($opt['type']) {
+                    case 'image':
+                        self::__verifySaveImage($data, $key, $opt, $input);
+                        break;
+                    case 'file':
+                        self::__verifySaveFile($data, $key, $opt, $input);
+                        break;
+                    default:
+                        break;
+                }
+
+                // assign data
+                if ('boolean' === $opt['type']) {
+                    $data->{$key} = isset($input[$key]) ? (int) (boolean) $input[$key] : '0';
+                    $is_empty = false;
+                } elseif ('multiple' === $opt['type']) {
+                    $data->{$key} = isset($input[$key]) && is_array($input[$key]) ? $input[$key] : array();
+                    $is_empty = empty($data->{$key});
+                } else {
+                    $data->{$key} = isset($input[$key]) ? trim($input[$key]) : '';
+                    $is_empty = $data->{$key} === '';
+                }
+                if (! $is_empty) {
+                    switch ($opt['type']) {
+                        case 'date':
+                        case 'datetime':
+                            if ( ! ( $timestamp = strtotime($data->{$key}))) {
+                                throw new ValidatorException(sprintf(
+                                        _e('%s: 非正確的時間格式'),
+                                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+                            }
+                            if ('date' === $opt['type']) {
+                                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
+                                $data->{$key} = date($format, $timestamp);
+                            } else {
+                                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d H:i:s';
+                                $data->{$key} = date($format, $timestamp);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    if ( isset($opt['pattern']) && ! preg_match($opt['pattern'], $data->{$key})) {
+                        throw new ValidatorException( '<strong>'.HtmlValueEncode($label).'</strong>: '. $opt['title'] );
+                    }
+
+                    if ( isset($opt['list'])) {
+
+                        if ( is_array($data->{$key})) {
+                            foreach ($data->{$key} as $k => $v) {
+                                if ( ! isset($opt['list'][$v])) {
+                                    unset($data->{$key}[$k]);
+                                    unset($input[$key][$k]);
+                                }
+                            }
+                            if ( empty($data->{$key})) {
+                                if ( array_key_exists('default', $opt) ) {
+                                    $data->{$key} = $opt['default'];
+                                }
+                                if ( ! empty($opt['required'])) {
+                                    throw new ValidatorException(sprintf(
+                                            _e('%s: 必須選取'),
+                                            '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+                                }
+                            }
+                        } else {
+                            if ( ! isset($opt['list'][$data->{$key}])) {
+                                throw new ValidatorException(sprintf(
+                                        _e('%s: 不在允許的清單中'),
+                                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+                            }
+                        }
+                    }
+                } else {
+                    if ( array_key_exists('default', $opt) ) {
+                        $data->{$key} = $opt['default'];
+                    }
+                    if ( ! empty($opt['required']) ) {
+                        throw new ValidatorException(sprintf(
+                                _e('%s: 不能為空'),
+                                '<strong>' . HtmlValueEncode($label) . '</strong>'));
+                    }
+
+                }
+                self::_doCallbacks($opt, $data, $key);
+
+            } catch ( Exception $ex ) {
+                $errors[] = '<li>' . $ex->getMessage() . '</li>';
+                continue;
+            }
+        }
+
+        if ( isset($errors[0])) {
+            throw new ValidatorException('<ul>'.implode("\n", $errors).'</ul>');
+        }
+    }
+
+    /**
+     * @TODO
      * 儲存圖片，若為圖片更新則會刪除舊圖片之後再存新圖
      *
      * $opt
@@ -1606,10 +2072,6 @@ class Validator
      *      [{suffix}] (array)
      *          [size] (array)
      *          [crop] (bool)
-     *
-     *
-     * @return void
-     * @author Me
      */
     private static function __verifySaveImage($data, $key, $opt, &$input)
     {
@@ -1637,25 +2099,25 @@ class Validator
         unset($uploader);
 
         if ( ! $gd->checkImageExtension($fileKey)) {
-            throw new Exception(sprintf(
+            throw new ValidatorException(sprintf(
                     _e('%s: 圖片類型只能是 jpg, png, gif'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
         }
 
         if ( ! $gd->checkImageType($fileKey)) {
-            throw new Exception(sprintf(
+            throw new ValidatorException(sprintf(
                     _e('%s: 圖片類型只能是 jpg, png, gif'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
 
         }
         if ( ! $gd->checkImageSize($fileKey, $opt['max_size'])) {
-            throw new Exception(sprintf(
+            throw new ValidatorException(sprintf(
                     _e('%s: 圖片檔案大小不能超過 %sK'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>',
                     $opt['max_size'] ));
         }
         if ( ! $source = $gd->uploadImage($fileKey)) {
-            throw new Exception(sprintf(
+            throw new ValidatorException(sprintf(
                     _e('%s: 圖片上傳失敗，請稍後再上傳一次'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>'));
         }
@@ -1668,7 +2130,7 @@ class Validator
             }
             if ( isset($opt['thumbnails'])) {
                 $oldinfo = pathinfo($data->{$key});
-                if ( !isset($oldinfo['filename'])) {
+                if ( !isset($oldinfo['filename'])) { // < php5.2.0
                     $oldinfo['filename'] = substr($oldinfo['basename'], 0, strlen($oldinfo['basename'])-strlen($oldinfo['extension'])-1);
                 }
                 foreach ($opt['thumbnails'] as $suffix => $sOpt) {
@@ -1686,7 +2148,7 @@ class Validator
             $method = $opt['method'];
         }
         $info = pathinfo($source);
-        if ( !isset($info['filename'])) {
+        if ( !isset($info['filename'])) { // < php5.2.0
             $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
         }
         $filename = $info['filename'];
@@ -1717,6 +2179,9 @@ class Validator
             }
         }
     }
+    /**
+     * @TODO
+     */
     private static function __verifySaveFile($data, $key, $opt, &$input)
     {
         $label = $opt['label'];
@@ -1767,124 +2232,13 @@ class Validator
                 }
             }
         } catch ( Exception $ex ) {
-            throw new Exception( '<strong>'.HtmlValueEncode($label).'</strong>: '. $ex->getMessage() );
+            throw new ValidatorException( '<strong>'.HtmlValueEncode($label).'</strong>: '. $ex->getMessage() );
         }
     }
 
-    public static function verify($fields, $data, &$input=NULL)
-    {
-        $errors = array();
-
-        if ($input === NULL) {
-            $input = &$_POST;
-        }
-        // verify data
-        foreach ($fields as $key  => $opt) {
-            try {
-
-                $label = $opt['label'];
-
-                if ( ! isset($opt['type'])) {
-                    $opt['type'] = null;
-                }
-
-                // upload files
-                switch ($opt['type']) {
-                    case 'image':
-                        self::__verifySaveImage($data, $key, $opt, $input);
-                        break;
-                    case 'file':
-                        self::__verifySaveFile($data, $key, $opt, $input);
-                        break;
-                    default:
-                        break;
-                }
-
-                // assign data
-                if ('boolean' === $opt['type']) {
-                    $data->{$key} = isset($input[$key]) ? (int) (boolean) $input[$key] : '0';
-                    $is_empty = false;
-                } elseif ('multiple' === $opt['type']) {
-                    $data->{$key} = isset($input[$key]) && is_array($input[$key]) ? $input[$key] : array();
-                    $is_empty = empty($data->{$key});
-                } else {
-                    $data->{$key} = isset($input[$key]) ? trim($input[$key]) : '';
-                    $is_empty = $data->{$key} === '';
-                }
-                if (! $is_empty) {
-                    switch ($opt['type']) {
-                        case 'date':
-                        case 'datetime':
-                            if ( ! ( $timestamp = strtotime($data->{$key}))) {
-                                throw new Exception(sprintf(
-                                        _e('%s: 非正確的時間格式'),
-                                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
-                            }
-                            if ('date' === $opt['type']) {
-                                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
-                                $data->{$key} = date($format, $timestamp);
-                            } else {
-                                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d H:i:s';
-                                $data->{$key} = date($format, $timestamp);
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-                    if ( isset($opt['pattern']) && ! preg_match($opt['pattern'], $data->{$key})) {
-                        throw new Exception( '<strong>'.HtmlValueEncode($label).'</strong>: '. $opt['title'] );
-                    }
-
-                    if ( isset($opt['list'])) {
-
-                        if ( is_array($data->{$key})) {
-                            foreach ($data->{$key} as $k => $v) {
-                                if ( ! isset($opt['list'][$v])) {
-                                    unset($data->{$key}[$k]);
-                                    unset($input[$key][$k]);
-                                }
-                            }
-                            if ( empty($data->{$key})) {
-                                if ( array_key_exists('default', $opt) ) {
-                                    $data->{$key} = $opt['default'];
-                                }
-                                if ( ! empty($opt['required'])) {
-                                    throw new Exception(sprintf(
-                                            _e('%s: 必須選取'),
-                                            '<strong>' . HtmlValueEncode($label) . '</strong>' ));
-                                }
-                            }
-                        } else {
-                            if ( ! isset($opt['list'][$data->{$key}])) {
-                                throw new Exception(sprintf(
-                                        _e('%s: 不在允許的清單中'),
-                                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
-                            }
-                        }
-                    }
-                } else {
-                    if ( array_key_exists('default', $opt) ) {
-                        $data->{$key} = $opt['default'];
-                    }
-                    if ( ! empty($opt['required']) ) {
-                        throw new Exception(sprintf(
-                                _e('%s: 不能為空'),
-                                '<strong>' . HtmlValueEncode($label) . '</strong>'));
-                    }
-
-                }
-                self::_doCallbacks($opt, $data, $key);
-
-            } catch ( Exception $ex ) {
-                $errors[] = '<li>' . $ex->getMessage() . '</li>';
-                continue;
-            }
-        }
-
-        if ( isset($errors[0])) {
-            throw new Exception('<ul>'.implode("\n", $errors).'</ul>');
-        }
-    }
+    /**
+     * @TODO
+     */
     private static function _doCallbacks(&$opt, $data, $key)
     {
         if ( !isset($opt['callbacks'])) {
@@ -1907,41 +2261,79 @@ class Validator
                     $data->{$key} = call_user_func_array($func, $params);
                 }
             } catch ( Exception $ex ) {
-                throw new Exception( '<strong>'.HtmlValueEncode($opt['label']).'</strong>: '. $ex->getMessage() );
+                throw new ValidatorException( '<strong>'.HtmlValueEncode($opt['label']).'</strong>: '. $ex->getMessage() );
             }
         }
     }
+
+
+    // Rules
+    /**
+     * Validates that $value is no empty after tag stripped.
+     *
+     * @param string $value The value to be checked
+     * @return string $value
+     * @throws ValidatorException if the value is not valid.
+     */
     public static function requiredText($value)
     {
         if ( '' === trim(strip_tags($value))) {
-            throw new Exception(_e('文字必須填寫'));
+            throw new ValidatorException(__('文字必須填寫'));
         }
 
         return $value;
     }
+
+    /**
+     * Validates that $value is numeric.
+     *
+     * @param integer $value The value to be checked
+     * @return integer $value
+     * @throws ValidatorException if the value is not numeric.
+     */
     public function numeric($value)
     {
         if ( ! is_numeric($value)) {
-            throw new Exception(_e('必須是數字'));
+            throw new ValidatorException(__('必須是數字'));
         }
 
         return $value;
     }
+
+    /**
+     * Validates that $value is between $min and $max
+     *
+     * @param integer $value The value to be checked
+     * @param integer $min
+     * @param integer $max
+     * @return integer $value
+     * @throws ValidatorException if the value is not between $min and $max.
+     */
     public static function between($value, $min, $max)
     {
         if ( ($value < $min) || ($value > $max)) {
-            throw new Exception(sprintf(_e('數字範圍為%s~%s'), $min, $max));
+            throw new ValidatorException(sprintf(__('數字範圍為%s~%s'), $min, $max));
         }
 
         return $value;
     }
-    public static function date($value, $format='yyyy/mm/dd', $forceYearLength=false)
-    {
-        //Date yyyy-mm-dd, yyyy/mm/dd, yyyy.mm.dd
-        //1900-01-01 through 2099-12-31
 
+    /**
+     * Validates that $value is a date string
+     *
+     * @param string $value The value to be checked
+     * @param string $format Could be one of
+     *  `dd/mm/yy`, `mm/dd/yy`, `mm/dd/yyyy`, `dd/mm/yyyy`,
+     *  `yy/mm/dd`, `yyyy/mm/dd`
+     * @param boolean $strictYear Check year length strictly.
+     * @return string $value
+     * @throws ValidatorException if the value is not a valid date string.
+     */
+    public static function date($value, $format='yyyy/mm/dd', $strictYear=false)
+    {
+        // Year 1900-01-01 through 2099-12-31
         $yearFormat = "(19|20)?[0-9]{2}";
-        if ($forceYearLength == true) {
+        if ($strictYear == true) {
             if (strpos($format, 'yyyy') !== false) {
                 $yearFormat = "(19|20)[0-9]{2}";
             } else {
@@ -1971,31 +2363,54 @@ class Validator
         }
 
         if (!preg_match($pattern, $value)) {
-            throw new Exception( sprintf(__('日期格式不正確!請使用%s格式'), $format));
+            throw new ValidatorException( sprintf(__('日期格式不正確!請使用%s格式'), $format));
         }
 
         return $value;
     }
+
+    /**
+     * Validates that $value is a datetime string
+     *
+     * @param string $value The value to be checked
+     * @return string $value
+     * @throws ValidatorException if the value is not a valid datetime string.
+     */
     public static function datetime($value)
     {
         $rs = strtotime($value);
 
         if ($rs===false || $rs===-1) {
-            throw new Exception(__('時間格式不正確'));
+            throw new ValidatorException(__('時間格式不正確'));
         }
 
         return $value;
     }
 
+    /**
+     * Check if the value is a valid Taiwan ID number / Taiwan ARC number / Passport number
+     *
+     * @param string $value The value to be checked
+     * @param string $identityType Could be one of `id`(Taiwan ID), `arc`(Taiwan ARC) or `passport`.
+     * @return string $value
+     * @throws ValidatorException if the value is not valid.
+     */
     public static function idNumber($value, $identityType='id')
     {
         if ( ! self::_idNumber($value, $identityType)) {
-            throw new Exception(__('請輸入有效的證件編號'));
+            throw new ValidatorException(__('請輸入有效的證件編號'));
         }
 
         return $value;
     }
 
+    /**
+     * Check if the value is a valid Taiwan ID number / Taiwan ARC number / Passport number
+     *
+     * @param string $value The value to be checked
+     * @param string $identityType Could be one of `id`(Taiwan ID), `arc`(Taiwan ARC) or `passport`.
+     * @return boolean
+     */
     private static function _idNumber($value, $identityType='id')
     {
         if ('passport' === $identityType) {
@@ -2041,6 +2456,31 @@ class Validator
         return ($sum % 10 === 0);
     }
 
+    /**
+     * Check if the value is a valid hex number.
+     *
+     * @param string $value The value to be checked
+     * @return string $value
+     * @throws ValidatorException if the value is not a valid hex number.
+     */
+    public static function hexColor($value)
+    {
+        if (!preg_match("/^#(?:[0-9a-fA-F]{3}){1,2}$/", $value)) {
+            throw new ValidatorException(__('請輸入 HEX 色碼如: #FFF 或 #FFFFFF'));
+        }
+
+        return $value;
+    }
+
+    /**
+     * Check if the value is null or is existing in database.
+     *
+     * @param string $value The value to be checked
+     * @param string $model The name of the model.
+     * @param array|integer|string|Search A Search object or an array of WHERE conditions or the value of primary key.
+     * @return string $value
+     * @throws ValidatorException if the value is not valid.
+     */
     public static function NullOrHasRecord($value, $model, $search=NULL)
     {
         if (NULL === $value) {
@@ -2050,6 +2490,15 @@ class Validator
         return self::hasRecord($value, $model, $search);
     }
 
+    /**
+     * Check if the value is existing in database.
+     *
+     * @param string $value The value to be checked
+     * @param string $model The name of the model.
+     * @param array|integer|string|Search A Search object or an array of WHERE conditions or the value of primary key.
+     * @return string $value
+     * @throws ValidatorException if the value is not valid.
+     */
     public static function hasRecord($value, $model, $search=NULL)
     {
         if ( ! class_exists($model)) {
@@ -2060,6 +2509,7 @@ class Validator
         $mconf = $tmpModel->getConfig();
         unset($tmpModel);
 
+        // Search primaryKey=$value
         if ( is_object($search) && $search instanceof Search) {
             array_unshift($search->where, $mconf['primaryKey']);
             array_unshift($search->params, $value);
@@ -2070,15 +2520,7 @@ class Validator
         }
 
         if ( ! DBHelper::count($model, $search) ) {
-            throw new Exception(__('資料不存在'));
-        }
-
-        return $value;
-    }
-    public static function hexColor($value)
-    {
-        if (!preg_match("/^#(?:[0-9a-fA-F]{3}){1,2}$/", $value)) {
-            throw new Exception(__('請輸入 HEX 色碼如: #FFF 或 #FFFFFF'));
+            throw new ValidatorException(__('資料不存在'));
         }
 
         return $value;
@@ -2408,22 +2850,61 @@ class Urls
 /**
  * Route
  *
- * @TODO document
- *
  * @package Core
  */
 class Route
 {
-    private $_routes = array();
-    private $_namedRoutes = array();
-    private $_defaultParams = array();
-    private $_history = array();
+    /**
+     * Stores route config, has the following structure:
+     *
+     * <pre>
+     *  [__defaultParams]
+     *      [controller] string
+     *      [action] string
+     *      [format] string
+     *
+     *  [{uri regexp}] (Optional)
+     *      [controller] string - Default controller
+     *      [action] string - Default action
+     *      [format] string - Default format
+     *      [__id] string - Optional - The route name
+     * </pre>
+     * @var array
+     */
+    private $__routes = array();
 
+    /**
+     * Stores named route config.
+     *
+     * @var array
+     */
+    private $__namedRoutes = array();
+
+    /**
+     * Stores default parameters.
+     *
+     * @var array
+     */
+    private $__defaultParams = array();
+
+    /**
+     * Stores request history.
+     *
+     * @var array
+     */
+    private $__history = array();
+
+    /**
+     * Constructor
+     *
+     * @param string|array $routeConfig Can be one of the following type:<br />
+     * `string` - The route file, will include `config/route.{$routeConfig}.php` and get the returning array as `$routeConfig`.<br />
+     * `array` - Set `$routeConfig` directly. {@see Route::$__routes}
+     * @return void
+     */
     public function __construct($routeConfig)
     {
-        if (NULL === $routeConfig) {
-            $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'route.' . App::$id . '.php';
-        } elseif (is_string($routeConfig)) {
+        if (is_string($routeConfig)) {
             $file = ROOT_PATH . 'config' . DIRECTORY_SEPARATOR . 'route.' . $routeConfig . '.php';
         }
 
@@ -2436,32 +2917,52 @@ class Route
 
         $this->setRoutes($routeConfig);
     }
+
+    /**
+     * Update route config
+     *
+     * @param array $routeConfig {@see Route::$__routes}
+     * @return void
+     */
     public function setRoutes($routeConfig)
     {
         if ( isset($routeConfig['__defaultParams'])) {
-            $this->_defaultParams = $routeConfig['__defaultParams'];
+            $this->__defaultParams = $routeConfig['__defaultParams'];
             $_REQUEST = array_merge($_REQUEST, $routeConfig['__defaultParams']);
             unset($routeConfig['__defaultParams']);
         }
 
-        $this->_routes = $routeConfig;
-        $this->_namedRoutes = self::_filterNamedRoutes($this->_routes);
+        $this->__routes = $routeConfig;
+        $this->__namedRoutes = self::__filterNamedRoutes($this->__routes);
     }
+
+    /**
+     * Append default route to current route config.
+     *
+     * The `default` route is `{{controller}}/{{action}}/{{id}}.{{format}}`
+     *
+     * @return void
+     */
     public function appendDefaultRoute()
     {
-        // remember that if you changed default route pattern, you have to modify the Route::urltoId method
-        // default route: {{controller}}/{{action}}/{{id}}.{{format}}
-
+        // @NOTE if you changed route regexp heare, you have to modify `Route::urltoId` method too.
         $pattern = '(?P<controller>[^./]+)?(/(?P<action>[^./]+)(/(?P<id>[^./]+))?)?(\.(?P<format>[^/]+))?';
         $config = array('__id' => 'default');
 
-        $this->_routes[$pattern] = $config;
+        $this->__routes[$pattern] = $config;
 
         // update named routes
-        $named = self::_filterNamedRoutes(array( $pattern => $config ));
-        $this->_namedRoutes['default'] = $named['default'];
+        $named = self::__filterNamedRoutes(array( $pattern => $config ));
+        $this->__namedRoutes['default'] = $named['default'];
     }
-    private static function _filterNamedRoutes($routes)
+
+    /**
+     * Collect routes that has named with [__id] attribute.
+     *
+     * @param array $routes {@see Route::$__routes}
+     * @return array
+     */
+    private static function __filterNamedRoutes($routes)
     {
         $namedRoutes = array();
         foreach ($routes as $pattern => $config) {
@@ -2474,23 +2975,43 @@ class Route
 
         return $namedRoutes;
     }
+
+    /**
+     * Returns named routes
+     *
+     * @param null|string $key `NULL` to return all named routes, or give route name to return corresponding route config.
+     * @return null|array
+     */
     public function getNamedRoutes($key=NULL)
     {
         if (NULL === $key) {
-            return $this->_namedRoutes;
+            return $this->__namedRoutes;
         }
 
-        return !isset($this->_namedRoutes[$key]) ? NULL : $this->_namedRoutes[$key];
+        return (!isset($this->__namedRoutes[$key]) ? NULL : $this->__namedRoutes[$key]);
     }
+
+    /**
+     * Return value stored in $this->__routes['__defaultParams']
+     *
+     * @param string $key The value key in `__defaultParams` array. e.g. `controller`, `action` or `format`
+     * @return void
+     */
     public function getDefault($key)
     {
-        return isset($this->_defaultParams[$key]) ? $this->_defaultParams[$key] : null;
+        return (!isset($this->__defaultParams[$key]) ? NULL : $this->__defaultParams[$key]);
     }
+
+    /**
+     * Parse current request uri and store the variables corresponding to the pattern to $_REQUEST.
+     *
+     * @return void
+     */
     public function parse()
     {
         $urls = App::urls();
         $queryString = implode('/', $urls->getSegments());
-        foreach ($this->_routes as $pattern => $config) {
+        foreach ($this->__routes as $pattern => $config) {
             if ( !preg_match('#^' . $pattern . '#', $queryString, $matches)) {
                 continue;
             }
@@ -2500,8 +3021,8 @@ class Route
             $_REQUEST = array_merge($_REQUEST, $config);
             foreach ($matches as $name => $value) {
                 if ( is_string($name)) {
-                    if ('' === $value && isset($this->_defaultParams[$name])) {
-                        $_REQUEST[$name] = $this->_defaultParams[$name];
+                    if ('' === $value && isset($this->__defaultParams[$name])) {
+                        $_REQUEST[$name] = $this->__defaultParams[$name];
                     } elseif (isset($config[$name])) {
                         $_REQUEST[$name] = $config[$name];
                     } else {
@@ -2513,33 +3034,55 @@ class Route
         }
     }
 
-    public function forwardTo($controller, $action)
-    {
-        $this->addHistory($controller, $action);
-        self::acl()->check();
-        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
-    }
+    /**
+     * Push current request to history and set the new action as current.
+     *
+     * @param string $controller The new controller name
+     * @param string $action The new action name
+     * @return void
+     */
     public function addHistory($controller, $action)
     {
-        $this->_history[] = array(
+        $this->__history[] = array(
             'controller' => $_REQUEST['controller'],
             'action' => $_REQUEST['action']
         );
         $_REQUEST['controller'] = $controller;
         $_REQUEST['action'] = $action;
     }
+
+    /**
+     * Push current request to history and execute acl checking for the new action then execute the action.
+     *
+     * @param string $controller The new controller name
+     * @param string $action The new action name
+     * @return void
+     */
+    public function forwardTo($controller, $action)
+    {
+        $this->addHistory($controller, $action);
+        self::acl()->check();
+        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
+    }
+
+    /**
+     * Get an entry from history
+     *
+     * @param string $offset Can be either `first` or `last`.
+     * @return array
+     */
     public function getHistory($offset=null)
     {
         if ('last' === $offset) {
-            $length = sizeof($this->_history);
+            $length = sizeof($this->__history);
 
-            return !$length ? array() : $this->_history[$length-1];
+            return !$length ? array() : $this->__history[$length-1];
         }
         if ('first' === $offset) {
-            return !isset($this->_history[0]) ? array() : $this->_history[0];
+            return !isset($this->__history[0]) ? array() : $this->__history[0];
         }
 
-        return $this->_history;
+        return $this->__history;
     }
 } // END class
 
@@ -2672,13 +3215,31 @@ class Acl
 /**
  * I18N
  *
- * @TODO document
  * @package Core
  */
 class I18N
 {
-    public $translation;
+    /**
+     * Stores Translations instance.
+     *
+     * @var Translations|NOOP_Translations
+     */
+    private $__translation;
 
+    /**
+     * Constructor
+     *
+     * @param array $config I18N configuration, defaults are:<br /><br />
+     *
+     * `[locale]` `string` (Default: 'zh_TW.UTF8')<br />
+     * `[encoding]` `string` (Default: 'UTF-8')<br />
+     * `[folder]` `string` (Default: 'locales' . DIRECTORY_SEPARATOR) // relative to ROOT_PATH<br />
+     * `[domain]` `string` (Default: 'default')<br /><br />
+     *
+     * According to the configuration, the PO File Path will be `{ROOT_PATH}{folder}/{domain}.{locale}.po`
+     *
+     * @return void
+     */
     public function __construct($config=array())
     {
         $config = array_merge(array(
@@ -2688,31 +3249,44 @@ class I18N
             'domain'    => 'default',
         ), $config);
 
-        App::loadVendor('pomo' . DIRECTORY_SEPARATOR . 'po', false, 'common');
+        App::loadVendor('beata/pomo' . DIRECTORY_SEPARATOR . 'po', false, 'common');
 
         $this->loadTextDomain($config);
     }
+
+    /**
+     * Load another PO File
+     *
+     * @param array $config {{@see I18N::__construct()}}
+     * @return void
+     */
     public function loadTextDomain($config)
     {
         $this->config = $config;
 
         $pofile = $config['folder'] . $config['domain'] . '.' . $config['locale'] . '.po';
         if ( ! is_readable($pofile)) {
-            $this->translation = new NOOP_Translations;
+            $this->__translation = new NOOP_Translations;
 
             return false;
         }
         $po = new PO();
         if ( ! $po->import_from_file($pofile)) {
-            $this->translation = new NOOP_Translations;
+            $this->__translation = new NOOP_Translations;
 
             return false;
         }
-        $this->translation = $po;
+        $this->__translation = $po;
 
         return true;
     }
 
+    /**
+     * Returns current locale name
+     *
+     * @param boolean $withEncoding If this parameter is set to true, the returning string will include encoding, such as `zh_TW.UTF8`. Set to false if you want to get locale string without encoding (like `zh_TW`).
+     * @return string
+     */
     public function getLocalName($withEncoding=TRUE)
     {
         if ($withEncoding) {
@@ -2720,6 +3294,16 @@ class I18N
         }
 
         return current(explode('.', $this->config['locale']));
+    }
+
+    /**
+     * Return current Translations instance.
+     *
+     * @return Translations|NOOP_Translations
+     */
+    public function getTranslation()
+    {
+        return $this->__translation;
     }
 } // END class
 
