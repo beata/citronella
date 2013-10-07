@@ -400,7 +400,7 @@ class GdImage
         return true;
     }
 
-        public function adaptiveResizeCropExcess($file, $width=128, $height=128, $rename='', $cropFrom='auto')
+        public function adaptiveResizeCropExcess($file, $width=128, $height=128, $rename='', $cropOrigin='center')
         {
         $file = $this->uploadPath . $file;
 
@@ -427,7 +427,7 @@ class GdImage
             $srcH = round($height / ($width / $imginfo['width']));
             $srcY = round(($imginfo['height'] / 2) - ($srcH / 2));
         }
-        if ('top' === $cropFrom) {
+        if ('top' === $cropOrigin) {
             $srcY = 0;
         }
 

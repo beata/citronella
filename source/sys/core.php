@@ -8,6 +8,7 @@
 
 
 /**
+ * NotFoundException
  * @package Core
  */
 class NotFoundException extends Exception
@@ -111,10 +112,12 @@ class App
     /**
      * Boot application and execute the controller action for http request.
      *
-     * @param  array  $routeConfig {@see Route::$__routes} for more detail.
-     * @param  array  $aclConfig {@see Acl} for more detail.
-     * @param  string $aclRole {@see Acl} for more detail.
+     * @param  array  $routeConfig {@see Route::__construct()} for more detail.
+     * @param  array  $aclConfig {@see Acl::__construct()} for more detail.
+     * @param  string $aclRole {@see Acl::__construct()} for more detail.
      * @return void
+     * @see Route::__construct() Route::__construct()
+     * @see Acl::__construct() Acl::__construct()
      */
     public static function run($routeConfig=NULL, $aclConfig=NULL, $aclRole='anonymous')
     {
@@ -223,8 +226,9 @@ class App
      *
      * If Route instance exists, the instance will be reconfigure with `$routeConfig`
      *
-     * @param  array  $routeConfig {@see Route::$__routes} for more detail.
+     * @param  array  $routeConfig {@see Route::__construct()} for more detail.
      * @return Route
+     * @see Route::__construct() Route::__construct()
      */
     public static function route($routeConfig=NULL)
     {
@@ -244,9 +248,10 @@ class App
      *
      * If Acl instance not exists, the instance will be created with `$aclConfig` and `$aclRole`
      *
-     * @param  array  $aclConfig {@see Acl} for more detail.
-     * @param  string $aclRole {@see Acl} for more detail.
+     * @param  array  $aclConfig {@see Acl::__construct()} for more detail.
+     * @param  string $aclRole {@see Acl::__construct()} for more detail.
      * @return Acl
+     * @see Acl::__construct() Acl::__construct()
      */
     public static function acl($aclConfig=NULL, $aclRole=NULL)
     {
@@ -314,9 +319,10 @@ class App
      * Returns the specific Urls instance or create a new one.
      *
      * @param string $key The access key of the Urls instance.
-     * @param string $urlBase {@see Urls} for more detail.
-     * @param string $paramName {@see Urls} for more detail.
+     * @param string $urlBase {@see Urls::__construct()} for more detail.
+     * @param string $paramName {@see Urls::__construct()} for more detail.
      * @return Urls
+     * @see Urls::__construct() Urls::__construct()
      */
     public static function urls($key='primary', $urlBase=NULL, $paramName='q')
     {
@@ -346,8 +352,9 @@ class App
      *
      * Or create a new I18N instance with `$config`
      *
-     * @param array $config {@see I18N} for more detail.
+     * @param array $config {@see I18N::__construct()} for more detail.
      * @return I18N
+     * @see I18N::__construct() I18N::__construct()
      */
     public static function i18n($config=array())
     {
@@ -699,12 +706,14 @@ abstract class Module
  *
  * @package Core
  *
- * @param array $rawValueFields An associative array of columns that won't be escaped during save.
+ * @property array $rawValueFields An associative array of columns that won't be escaped in query.
  *
  * @method vold beforeVerify(array &$fields, array &$input=NULL, mixed $args=NULL) Executs before verify
  * @method vold beforeSave(array &$fields, array &$input=NULL, mixed $args=NULL) Executs before save
  * @method vold afterSave(array &$fields, array &$input=NULL, mixed $args=NULL) Executs after save
- * @method array fields($for=NULL, $search=NULL) Returns validation settings for each field. {{@see Validator::verify()}}
+ * @method array fields($for=NULL, $search=NULL) Returns validation settings for each field. {@see Validator::verify()}
+ *
+ * @see Validator::verify() Validator::verify()
  */
 abstract class Model
 {
@@ -749,10 +758,11 @@ abstract class Model
     /**
      * Verifies input variables by fields settings.
      *
-     * @param &array $fields The fields settings. {{@see Model::fields()}}
+     * @param &array $fields The fields settings. {@see Validator::verify()}
      * @param &array $input The input data.
      * @param mixed $args Any value that would be sent to `$this->beforeVerify()`
      * @return void
+     * @see Validator::verify() Validator::verify()
      */
     public function verify(&$fields, &$input=NULL, $args=NULL)
     {
@@ -772,11 +782,12 @@ abstract class Model
      * 5. `insert() / update()`
      * 6. `afterSave()`
      *
-     * @param &array $fields The fields settings. {{@see Model::fields()}}
+     * @param &array $fields The fields settings. {@see Validator::verify()}
      * @param boolean $verify Whether or not to verify the input data.
-     * @param &array $input The input data.
+     * @param &array $input The input data. If not set, `$_POST` array would be used as $input
      * @param mixed $args Any value that would be used in the process.
      * @return void
+     * @see Validator::verify() Validator::verify()
      */
     public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
     {
@@ -815,9 +826,9 @@ abstract class Model
      *
      * Insert a record with columns which are in `$fieldNames` and set models's primary key to the last inserted id.
      *
-     * @see Model::$rawValueFields
      * @param array $fieldNames Columns list that would be saved.
      * @return void
+     * @see Model::$rawValueFields Model::$rawValueFields
      */
     public function insert($fieldNames)
     {
@@ -967,6 +978,8 @@ abstract class Model
      * </pre>
      *
      * @return void
+     * @see Search Search
+     * @see Model::$_config Model::$_config
      */
     public static function selectBelongsTo(&$select, $config, $columns='name')
     {
@@ -1014,6 +1027,8 @@ abstract class Model
      * </pre>
      *
      * @return void
+     * @see Search Search
+     * @see Model::$_config Model::$_config
      */
     public static function selectHasMany(&$select, $config, $columns=array())
     {
@@ -1584,6 +1599,7 @@ class DBHelper
      * @param string $value
      * @param string|integer|array $ignoreId If has duplicated record, ignore if the record matches $ignoreId. `$ignoreId` could be string, integer or an array of where conditions. {@see DBHelper::where()}
      * @return boolean
+     * @see DBHelper::where() DBHelper::where()
      */
     public static function isUniqIn($table, $field, $value, $ignoreId=NULL)
     {
@@ -1888,7 +1904,7 @@ class DBHelper
         if ( file_exists($dir . $data->{$column})) {
             unlink($dir . $data->{$column});
         }
-        if ( isset($options['suffixes'])) {
+        if ( !empty($options['suffixes'])) {
             $info = pathinfo($data->{$column});
             if ( !isset($info['filename'])) { // < php5.2.0
                 $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
@@ -1933,6 +1949,7 @@ class DBHelper
 
 
 /**
+ * ValidatorException
  * @package Core
  */
 class ValidatorException extends Exception {}
@@ -1944,7 +1961,105 @@ class ValidatorException extends Exception {}
 class Validator
 {
     /**
-     * @TODO
+     * Verifies fields
+     *
+     * @param array $fields The fields settings, has the following structure. <br /><br />
+     *
+     * `[label]` string **Required** <br />
+     *  - The label string of $data->{$key} <br /><br />
+     *
+     * `[type]` string Optional <br />
+     *  - Can be on of `image`, `file`, `boolean`, `multiple`, `date` or `datetime`. <br /><br />
+     *
+     * `[required]` boolean Optional <br />
+     *  - Validates $data->{$key} has value. <br /><br />
+     *
+     * `[list]` array Optional <br />
+     *  - An associative array of acceptable values in value-label pairs. <br /><br />
+     *
+     * `[default]` string Optional <br />
+     *  - The default value when $data->{$key} is blank. <br /><br /><br />
+     *
+     * `[callbacks]` array Optional <br />
+     *  - Methods to be executed after cheking process. Methods can be defined in `$data` class, `Validator`, or as a **global function**. <br />
+     *  ---- `[{MethodName}]` array - Execute method with parameters <br />
+     *  -------- `[]` param1 <br />
+     *  -------- `[]` param2, <br />
+     *  -------- `[]` ... <br />
+     *  ---- `[]` string - Execute method without parameters. <br /><br /><br />
+     *
+     * // =========================================<br />
+     * // When `[type]`=`date` or `datetime` <br />
+     * // =========================================<br />
+     * `[format]` string Optional Default:`Y-m-d`'or `Y-m-d H:i:s` <br />
+     *  - See PHP date format: http://php.net/manual/zh/function.date.php <br /><br /><br />
+     *
+     * // =========================================<br />
+     * // When `[type]`=`multiple` <br />
+     * // =========================================<br />
+     * `[default]` array Optional <br />
+     *  - An associative array of default values <br /><br /><br />
+     *
+     * // =========================================<br />
+     * // When `[type]`=`file` <br />
+     * // =========================================<br />
+     * `[dir]` string **Required**<br />
+     *  - Directory name that stores uploaded file. <br /><br />
+     *
+     * `[fileKey]` string Optional Default: `$key` <br />
+     *  - Alternative file key of $_FILES (e.g: `$_FILES[$fileKey]['tmp_name']`) <br /><br />
+     *
+     * `[rename]` boolean|string Optional Default: `TRUE`<br />
+     *  - Whether or not to rename the uploaded file, if set to `TRUE`, an auto-generated file name will be used.<br /><br />
+     *
+     * `[max_size]` integer Optional<br />
+     *  - Restrict file size of uploaded file in bytes.<br /><br />
+     *
+     * `[allow_types]` array Optional<br />
+     *  - Restrict the mime type of uploaded file.<br />
+     *  ---- `[{extention}]` array An array of mime types<br /><br />
+     *
+     * `[deny_files]` array Optional Default: `php, phps, php3, php4, phtml`<br />
+     *  - Reject uploaded file when its extention is listed in this option.<br /><br />
+     *
+     * // =========================================<br />
+     * // When `[type]`=`image` <br />
+     * // =========================================<br />
+     * `[dir]` string **Required** <br />
+     *  - Directory name that stores uploaded file. <br /><br />
+     *
+     * `[resize]` array **Required**<br />
+     *  ---- `[0]` integer Image width in pixel<br />
+     *  ---- `[1]` integer Image height in pixel<br /><br />
+     *
+     * `[fileKey]` string Optional Default: `$key` <br />
+     *  - Alternative file key of $_FILES (e.g: `$_FILES[$fileKey]['tmp_name']`) <br /><br />
+     *
+     * `[max_size]` integer Optional<br />
+     *  - Restrict file size of uploaded file in kilobytes.<br /><br />
+     *
+     * `[crop]` boolean Optional Default: false<br />
+     *  - Whether or not to crop when image dimensions exceed. Only works when `[method]` hasn't been set.<br /><br />
+     *
+     * `[cropOrigin]` string Optional Default: `center`<br />
+     *  - available values are: `center` or `top`<br /><br />
+     *
+     * `[method]` string Optional<br />
+     *  - Any thumbnail method in `GdImage`. {@see GdImage} <br /><br />
+     *
+     * `[thumbnails]` array Optional<br />
+     *  ---- `[{suffix}]` array Thumbnail options<br />
+     *  -------- `[method]` string<br />
+     *  -------- `[crop]` boolean<br />
+     *  -------- `[size]` array Same as `[resize]`<br />
+     *  -------- `[cropOrigin]` string<br /><br /><br />
+     *
+     *
+     * @param object $data Any object that would store input data later.
+     * @param &array $input The input data. If not set, `$_POST` array would be used as $input
+     * @throws ValidatorException if any of the fields isn't valid.
+     * @see http://php.net/manual/zh/function.date.php PHP date format
+     * @see GdImage GdImage
      */
     public static function verify($fields, $data, &$input=NULL)
     {
@@ -1960,83 +2075,44 @@ class Validator
                 $label = $opt['label'];
 
                 if ( ! isset($opt['type'])) {
-                    $opt['type'] = null;
+                    $opt['type'] = NULL;
                 }
 
-                // upload files
+                // assign input to $data object.
                 switch ($opt['type']) {
-                    case 'image':
+                    case 'image':   // handle uploaded image
                         self::__verifySaveImage($data, $key, $opt, $input);
                         break;
-                    case 'file':
+                    case 'file':    // handle uploaded file
                         self::__verifySaveFile($data, $key, $opt, $input);
                         break;
+                    case 'boolean':
+                        $data->{$key} = (isset($input[$key]) ? (int) (boolean) $input[$key] : '0');
+                        $is_empty = false;
+                        break;
+                    case 'multiple':
+                        $data->{$key} = (isset($input[$key]) && is_array($input[$key]) ? $input[$key] : array());
+                        $is_empty = empty($data->{$key});
+                        break;
                     default:
+                        $data->{$key} = (isset($input[$key]) ? trim($input[$key]) : '');
+                        $is_empty = $data->{$key} === '';
                         break;
                 }
 
-                // assign data
-                if ('boolean' === $opt['type']) {
-                    $data->{$key} = isset($input[$key]) ? (int) (boolean) $input[$key] : '0';
-                    $is_empty = false;
-                } elseif ('multiple' === $opt['type']) {
-                    $data->{$key} = isset($input[$key]) && is_array($input[$key]) ? $input[$key] : array();
-                    $is_empty = empty($data->{$key});
-                } else {
-                    $data->{$key} = isset($input[$key]) ? trim($input[$key]) : '';
-                    $is_empty = $data->{$key} === '';
-                }
                 if (! $is_empty) {
-                    switch ($opt['type']) {
-                        case 'date':
-                        case 'datetime':
-                            if ( ! ( $timestamp = strtotime($data->{$key}))) {
-                                throw new ValidatorException(sprintf(
-                                        _e('%s: 非正確的時間格式'),
-                                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
-                            }
-                            if ('date' === $opt['type']) {
-                                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
-                                $data->{$key} = date($format, $timestamp);
-                            } else {
-                                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d H:i:s';
-                                $data->{$key} = date($format, $timestamp);
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-                    if ( isset($opt['pattern']) && ! preg_match($opt['pattern'], $data->{$key})) {
-                        throw new ValidatorException( '<strong>'.HtmlValueEncode($label).'</strong>: '. $opt['title'] );
-                    }
 
+                    if ('date' === $opt['type'] || 'datetime' === $opt['type']) {
+                        self::__verifyDateTime($data, $key, $opt);
+                    }
+                    if ( isset($opt['pattern']) ) {
+                        self::pattern($data->{$key}, $opt['pattern'],
+                            '<strong>'.HtmlValueEncode($label).'</strong>: '. $opt['title']);
+                    }
                     if ( isset($opt['list'])) {
-
-                        if ( is_array($data->{$key})) {
-                            foreach ($data->{$key} as $k => $v) {
-                                if ( ! isset($opt['list'][$v])) {
-                                    unset($data->{$key}[$k]);
-                                    unset($input[$key][$k]);
-                                }
-                            }
-                            if ( empty($data->{$key})) {
-                                if ( array_key_exists('default', $opt) ) {
-                                    $data->{$key} = $opt['default'];
-                                }
-                                if ( ! empty($opt['required'])) {
-                                    throw new ValidatorException(sprintf(
-                                            _e('%s: 必須選取'),
-                                            '<strong>' . HtmlValueEncode($label) . '</strong>' ));
-                                }
-                            }
-                        } else {
-                            if ( ! isset($opt['list'][$data->{$key}])) {
-                                throw new ValidatorException(sprintf(
-                                        _e('%s: 不在允許的清單中'),
-                                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
-                            }
-                        }
+                        self::__verifyList($data, $key, $opt, $input);
                     }
+
                 } else {
                     if ( array_key_exists('default', $opt) ) {
                         $data->{$key} = $opt['default'];
@@ -2048,7 +2124,7 @@ class Validator
                     }
 
                 }
-                self::_doCallbacks($opt, $data, $key);
+                self::__doCallbacks($data, $key, $opt);
 
             } catch ( Exception $ex ) {
                 $errors[] = '<li>' . $ex->getMessage() . '</li>';
@@ -2056,22 +2132,98 @@ class Validator
             }
         }
 
-        if ( isset($errors[0])) {
+        if ( !empty($errors)) {
             throw new ValidatorException('<ul>'.implode("\n", $errors).'</ul>');
         }
     }
 
     /**
-     * @TODO
-     * 儲存圖片，若為圖片更新則會刪除舊圖片之後再存新圖
+     * Verifies $data->{$key} is a valid datetime string.
      *
-     * $opt
-     *  [resize] (array)
-     *  [crop] (bool)
-     *  [thumbnails] (array)
-     *      [{suffix}] (array)
-     *          [size] (array)
-     *          [crop] (bool)
+     * @param object $data The data object.
+     * @param string $key The access key of data object.
+     * @param &array $opt Options for `$data->{$key}` {@see Validator::verify()}
+     * @return void
+     * @throws ValidatorException if $data->{$key} isn't a valid datetime string.
+     * @see Validator::verify() Validator::verify()
+     */
+    private static function __verifyDateTime($data, $key, &$opt)
+    {
+        $label = $opt['label'];
+
+        if ( ! ( $timestamp = strtotime($data->{$key}))) {
+            throw new ValidatorException(sprintf(
+                    _e('%s: 非正確的時間格式'),
+                    '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+        }
+        if ('date' === $opt['type']) {
+            $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
+        } else {
+            $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d H:i:s';
+        }
+        $data->{$key} = date($format, $timestamp);
+    }
+
+    /**
+     * Verifies $data->{$key} in the list.
+     *
+     * @param object $data The data object.
+     * @param string $key The access key of data object.
+     * @param &array $opt Options for $data->{$key}. {@see Validator::verify()}
+     * @param &array $input The input array.
+     * @return void
+     * @throws ValidatorException if $data->{$key} isn't in the list.
+     * @see Validator::verify() Validator::verify()
+     */
+    private static function __verifyList($data, $key, &$opt, &$input)
+    {
+        $label = $opt['label'];
+
+        // single selection
+        if (!is_array($data->{$key})) {
+            if ( ! isset($opt['list'][$data->{$key}])) {
+                throw new ValidatorException(sprintf(
+                        _e('%s: 不在允許的清單中'),
+                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+            }
+            return;
+        }
+
+        // multiple selection
+
+        // delete options not listed
+        foreach ($data->{$key} as $k => $v) {
+            if ( ! isset($opt['list'][$v])) {
+                unset($data->{$key}[$k]);
+                unset($input[$key][$k]);
+            }
+        }
+
+        // check empty again after deletion.
+        if ( empty($data->{$key})) {
+            if ( array_key_exists('default', $opt) ) {
+                $data->{$key} = $opt['default'];
+            }
+            if ( ! empty($opt['required'])) {
+                throw new ValidatorException(sprintf(
+                        _e('%s: 必須選取'),
+                        '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+            }
+        }
+    }
+
+    /**
+     * Stores uploaded image and assign file name to $data->{$key}
+     *
+     * If there's an old image for $data->{$key}, this function will delete old image after uploading success.
+     *
+     * @param object $data The data object.
+     * @param string $key The access key of data object.
+     * @param &array $opt Options for $data->{$key}. {@see Validator::verify()}
+     * @param &array $input The input array.
+     * @return void
+     * @throws ValidatorException when meet uploading error.
+     * @see Validator::verify() Validator::verify()
      */
     private static function __verifySaveImage($data, $key, $opt, &$input)
     {
@@ -2083,21 +2235,24 @@ class Validator
         App::loadHelper('GdImage', false, 'common');
 
         $fileKey = ! empty($opt['fileKey']) ? $opt['fileKey'] : $key;
+
+        // file is not uploaded.
         if ( empty($_FILES[$fileKey]['name'])) {
             $input[$key] = $data->{$key};
-
             return;
         }
+
         // file upload
         $gd = new GdImage( $opt['dir'], $opt['dir'] );
         $gd->generatedType = strtolower(pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION));
 
         // check upload error
         App::loadHelper('Upload', false, 'common');
-        $uploader = new Upload(null, null);
+        $uploader = new Upload(NULL, NULL);
         $uploader->checkError($_FILES[$fileKey]['error']);
         unset($uploader);
 
+        // validate image
         if ( ! $gd->checkImageExtension($fileKey)) {
             throw new ValidatorException(sprintf(
                     _e('%s: 圖片類型只能是 jpg, png, gif'),
@@ -2123,25 +2278,17 @@ class Validator
         }
         $data->_new_files[] = $opt['dir'] . $source;
 
-        if ($data->{$key}) { // 移除舊檔案
-            $file = $gd->processPath . $data->{$key};
-            if (file_exists($file)) {
-                unlink($file);
-            }
-            if ( isset($opt['thumbnails'])) {
-                $oldinfo = pathinfo($data->{$key});
-                if ( !isset($oldinfo['filename'])) { // < php5.2.0
-                    $oldinfo['filename'] = substr($oldinfo['basename'], 0, strlen($oldinfo['basename'])-strlen($oldinfo['extension'])-1);
-                }
-                foreach ($opt['thumbnails'] as $suffix => $sOpt) {
-                    $file = $gd->processPath . $oldinfo['dirname'] . DIRECTORY_SEPARATOR . $oldinfo['filename'] . $suffix . '.' . $oldinfo['extension'];
-                    if ( file_exists($file)) {
-                        unlink($file);
-                    }
-                }
-            }
+        // remove old file
+        if ($data->{$key}) {
+            DBHelper::deleteFile(array(
+                'data' => $data,
+                'column' => $key,
+                'dir' => $gd->processPath,
+                'suffixes' => array_keys($opt['thumbnails'])
+            ));
             $data->{$key} = $input[$key] = '';
         }
+
         if (!isset($opt['method'])) {
             $method = empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
         } else {
@@ -2157,7 +2304,7 @@ class Validator
             $source,
             $opt['resize'][0], $opt['resize'][1],
             $filename,
-            (isset($opt['cropFrom']) ? $opt['cropFrom'] : null)
+            (isset($opt['cropOrigin']) ? $opt['cropOrigin'] : null)
         );
         $data->{$key} = $input[$key] = $source;
 
@@ -2173,14 +2320,24 @@ class Validator
                     $source,
                     $sOpt['size'][0], $sOpt['size'][1],
                     $filename . $suffix,
-                    (isset($sOpt['cropFrom']) ? $sOpt['cropFrom'] : null)
+                    (isset($sOpt['cropOrigin']) ? $sOpt['cropOrigin'] : null)
                 );
                 $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $ext;
             }
         }
     }
     /**
-     * @TODO
+     * Stores uploaded file and assign file name to $data->{$key}
+     *
+     * If there's an old file for $data->{$key}, this function will delete old file after uploading success.
+     *
+     * @param object $data The data object.
+     * @param string $key The access key of data object.
+     * @param &array $opt Options for $data->{$key}. {@see Validator::verify()}
+     * @param &array $input The input array.
+     * @return void
+     * @throws ValidatorException when meet uploading error.
+     * @see Validator::verify() Validator::verify()
      */
     private static function __verifySaveFile($data, $key, $opt, &$input)
     {
@@ -2190,9 +2347,10 @@ class Validator
         if ( ! isset($data->_new_files)) {
             $data->_new_files = array();
         }
+
+        // file is not uploaded.
         if ( empty($_FILES[$fileKey]['tmp_name'])) {
             $input[$key] = $data->{$key};
-
             return;
         }
 
@@ -2203,13 +2361,13 @@ class Validator
         if ( isset($opt['rename'])) {
             $uploader->rename = $opt['rename'];
         }
-        if ( isset($opt['max_size'])) {
+        if ( isset($opt['max_size'])) { // bytes
             $uploader->maxSize = $opt['max_size'];
         }
-        if ( isset($opt['allow_types'])) {
+        if ( isset($opt['allow_types'])) { // [ext] array mime list
             $uploader->allowTypes = $opt['allow_types'];
         }
-        if ( isset($opt['deny_files'])) {
+        if ( isset($opt['deny_files'])) { // extension list
             $uploader->denyFiles = $opt['deny_files'];
         }
 
@@ -2217,13 +2375,17 @@ class Validator
             $oldFile = $data->{$key};
             $newFile = $uploader->save();
 
-            if ( $oldFile && file_exists($opt['dir'] . $oldFile)) { // remove old file
+            // delete old file after uploading success.
+            if ( $oldFile && file_exists($opt['dir'] . $oldFile)) {
                 unlink($opt['dir'] . $oldFile);
             }
+
+            // assign new file to $data object
             $data->{$key} = $input[$key] = $newFile;
             $data->{$key.'_type'} = $input[$key.'_type'] = $uploader->getFileType();
             $data->{$key.'_orignal_name'} = $input[$key.'_orignal_name'] = $uploader->getOrignalName();
 
+            // add to _new_files array
             if ( ! is_array($data->{$key})) {
                 $data->_new_files[] = $opt['dir'] . DIRECTORY_SEPARATOR . $data->{$key};
             } else {
@@ -2237,9 +2399,18 @@ class Validator
     }
 
     /**
-     * @TODO
+     * Execute callback methods
+     *
+     * Execute methods defined in `$data`, Validator, or execute a global function.
+     *
+     * @param object $data The data object.
+     * @param string $key The access key of data object.
+     * @param &array $opt Options for `$data->{$key}`. {@see Validator::verify()}
+     * @return void
+     * @throws ValidatorException if catched Exception
+     * @see Validator::verify() Validator::verify()
      */
-    private static function _doCallbacks(&$opt, $data, $key)
+    private static function __doCallbacks($data, $key, &$opt)
     {
         if ( !isset($opt['callbacks'])) {
             return;
@@ -2253,11 +2424,11 @@ class Validator
                 $params = array($data->{$key});
             }
             try {
-                if ( method_exists($data, $func)) { // $data->$func()
+                if ( method_exists($data, $func)) {             // Execute $data->$func()
                     $data->{$key} = call_user_func_array(array($data, $func), $params);
-                } elseif ( method_exists(__CLASS__, $func)) { // Validator::$func()
+                } elseif ( method_exists(__CLASS__, $func)) {   // Execute Validator::$func()
                     $data->{$key} = call_user_func_array(array(__CLASS__, $func), $params);
-                } else {
+                } else {                                        // Execute a global function.
                     $data->{$key} = call_user_func_array($func, $params);
                 }
             } catch ( Exception $ex ) {
@@ -2311,6 +2482,9 @@ class Validator
      */
     public static function between($value, $min, $max)
     {
+        $min = (int)$min;
+        $max = (int)$max;
+
         if ( ($value < $min) || ($value > $max)) {
             throw new ValidatorException(sprintf(__('數字範圍為%s~%s'), $min, $max));
         }
@@ -2363,7 +2537,7 @@ class Validator
         }
 
         if (!preg_match($pattern, $value)) {
-            throw new ValidatorException( sprintf(__('日期格式不正確!請使用%s格式'), $format));
+            throw new ValidatorException( sprintf(__('日期格式不正確!請使用%s格式'), HtmlValueEncode($format)));
         }
 
         return $value;
@@ -2397,7 +2571,7 @@ class Validator
      */
     public static function idNumber($value, $identityType='id')
     {
-        if ( ! self::_idNumber($value, $identityType)) {
+        if ( ! self::__idNumber($value, $identityType)) {
             throw new ValidatorException(__('請輸入有效的證件編號'));
         }
 
@@ -2411,7 +2585,7 @@ class Validator
      * @param string $identityType Could be one of `id`(Taiwan ID), `arc`(Taiwan ARC) or `passport`.
      * @return boolean
      */
-    private static function _idNumber($value, $identityType='id')
+    private static function __idNumber($value, $identityType='id')
     {
         if ('passport' === $identityType) {
             return strlen($value) <= 20;
@@ -2523,6 +2697,23 @@ class Validator
             throw new ValidatorException(__('資料不存在'));
         }
 
+        return $value;
+    }
+
+    /**
+     * Check if the value matches pattern
+     *
+     * @param string $value The value to be checked
+     * @param string $pattern The regex pattern
+     * @param string $title Exception message when dismatch.
+     * @return string $value
+     * @throws ValidatorException if the value is not match to the pattern.
+     */
+    public static function pattern($value, $pattern, $title)
+    {
+        if (!preg_match($pattern, $value)) {
+            throw new ValidatorException($title);
+        }
         return $value;
     }
 }
@@ -2898,9 +3089,10 @@ class Route
      * Constructor
      *
      * @param string|array $routeConfig Can be one of the following type:<br />
-     * `string` - The route file, will include `config/route.{$routeConfig}.php` and get the returning array as `$routeConfig`.<br />
+     * `string` - The file name suffix of route config file, which will include `config/route.{$routeConfig}.php` and get the returning array as `$routeConfig`.<br />
      * `array` - Set `$routeConfig` directly. {@see Route::$__routes}
      * @return void
+     * @see Route::$__routes Route::$__routes
      */
     public function __construct($routeConfig)
     {
@@ -2923,6 +3115,7 @@ class Route
      *
      * @param array $routeConfig {@see Route::$__routes}
      * @return void
+     * @see Route::$__routes Route::$__routes
      */
     public function setRoutes($routeConfig)
     {
@@ -2961,6 +3154,7 @@ class Route
      *
      * @param array $routes {@see Route::$__routes}
      * @return array
+     * @see Route::$__routes Route::$__routes
      */
     private static function __filterNamedRoutes($routes)
     {
@@ -3087,17 +3281,58 @@ class Route
 } // END class
 
 /**
- * Acl
- *
- * @TODO document
+ * Access control
  *
  * @package Core
  */
 class Acl
 {
-    private $_rules = array();
-    private $_role = 'anonymous';
+    /**
+     * Stores ACL config, has the following structure:
+     *
+     * <pre>
+     *  [__default]
+     *      [allow] string|array The rule can be '*', '{controller}/*' or '{controller}/{action}', or using an array of rules.
+     *      [deny] string|array The rule can be '*', '{controller}/*' or '{controller}/{action}', or using an array of rules.
+     *      [__failRoute] string Can be '404', '{controller}' or '{controller}/{action}'.
+     *
+     *  [{role}] (Rules for specific role)
+     *      [allow] string|array
+     *      [deny] string|array
+     *      [__failRoute] string
+     *
+     *  [{role}] (The accessible action should be in allowing list, otherwise it shouldn't be in deny list.) {@see Acl::__isAccessible()}
+     *      [deny] '*'
+     *      [allow] array(...)
+     *      [__failRoute] string
+     *
+     *  [{role}] (The accessible action shouldn't be in deny list and should be in allowing list.) {@see Acl::__isAccessible()}
+     *      [allow] '*'
+     *      [deny] array(...)
+     *      [__failRoute] string
+     * </pre>
+     * @var array
+     * @see Acl::__isAccessible() Acl::__isAccessible()
+     */
+    private $__rules = array();
 
+    /**
+     * Stores the role.
+     *
+     * @var string
+     */
+    private $__role = 'anonymous';
+
+    /**
+     * Constructor
+     *
+     * @param string|array $aclConfig Can be one of the following type:<br />
+     * `string` - The file name suffix of acl config file, which will include `config/acl.{$aclConfig}.php` and get the returning array as `$aclConfig`.<br />
+     * `array` - Set `$aclConfig` directly. {@see Acl::$__rules}
+     * @param string The role.
+     * @return void
+     * @see Acl::$__rules Acl::$__rules
+     */
     public function __construct($aclConfig, $aclRole=NULL)
     {
         if (NULL === $aclConfig) {
@@ -3113,68 +3348,104 @@ class Acl
             $aclConfig = require_once($file);
         }
 
-        $this->_rules = $aclConfig;
-        $this->_role = $aclRole;
+        $this->__rules = $aclConfig;
+        $this->__role = $aclRole;
     }
 
-    private function _getRoleRules($role)
+    /**
+     * Get rules of specific role.
+     *
+     * @param string $role The role name.
+     * @return array
+     */
+    private function __getRoleRules($role)
     {
-        $defaultRule = !isset($this->_rules['__default']) ? array() : $this->_rules['__default'];
-        $rule = $this->_rules[$role];
+        $defaultRule = !isset($this->__rules['__default']) ? array() : $this->__rules['__default'];
+        $roleRules = $this->__rules[$role];
 
         // key 越後面的規則優先
-        foreach ($rule as $key => $value) {
+        foreach ($roleRules as $key => $value) {
             if ( isset($defaultRule[$key])) {
                 unset($defaultRule[$key]);
             }
         }
 
-        return array_merge($defaultRule, $rule);
+        return array_merge($defaultRule, $roleRules);
     }
 
+    /**
+     * Check if current may access current requested action.
+     *
+     * If not accessible, redirect current user to `$roleRules['__failRoute']`.
+     *
+     * @return void
+     * @throws NotFoundException if current request is not accessible and `$roleRules['__failRoute']` is equal to `'404'`
+     * @see Acl::$__rules Acl::$__rules
+     */
     public function check()
     {
-        $rule = $this->_getRoleRules($this->_role);
+        $roleRules = $this->__getRoleRules($this->__role);
 
-        if ( ! $this->_isAccessible($rule)) {
-            if ('404' === $rule['__failRoute']) {
+        if ( ! $this->__isAccessible($roleRules)) {
+            if ('404' === $roleRules['__failRoute']) {
                 throw new NotFoundException(_e('頁面不存在'));
             }
 
-            if ( false === strpos($rule['__failRoute'], '/')) {
-                $controller = $rule['__failRoute'];
+            if ( false === strpos($roleRules['__failRoute'], '/')) {
+                $controller = $roleRules['__failRoute'];
                 $action = App::route()->getDefault('action');
             } else {
-                $route = explode('/', $rule['__failRoute']);
+                $route = explode('/', $roleRules['__failRoute']);
                 $controller = $route[0];
                 $action = $route[1];
             }
             App::route()->addHistory($controller, $action);
         }
     }
-    private function _isAccessible($rule)
+
+    /**
+     * Check if current request is accessible by the $roleRules
+     *
+     * @param array $roleRules Rules of the specific role. {@see Acl::$__rules}
+     * @return boolean
+     * @see Acl::$__rules Acl::$__rules
+     */
+    private function __isAccessible($roleRules)
     {
-        $keys = array_keys($rule);
+        $keys = array_keys($roleRules);
         $allowPrior = array_search('allow', $keys);
         $denyPrior = array_search('deny', $keys);
         unset($keys);
 
         $path = $_REQUEST['controller'] . '/' . $_REQUEST['action'];
+
+
+        // allow first
         if ($denyPrior > $allowPrior) {
-            return ( !$this->_inList($path, $rule['deny']) && $this->_inList($path, $rule['allow']) );
+            // The accessible action shouldn't be in deny list and should be in allowing list.
+            return ( !$this->__inList($path, $roleRules['deny']) && $this->__inList($path, $roleRules['allow']) );
         }
 
-        return ( $this->_inList($path, $rule['allow']) || !$this->_inList($path, $rule['deny']));
+        // deny first
+        // The accessible action should be in allowing list or not in deny list.
+        return ( $this->__inList($path, $roleRules['allow']) || !$this->__inList($path, $roleRules['deny']));
     }
-    private function _inList($path, $rule)
+    /**
+     * Check if $path matches any one of $rules.
+     *
+     * @param string $path The path to be check.
+     * @param array $rules The rules
+     * @return boolean
+     */
+    private function __inList($path, $rules)
     {
-        if ( is_string($rule)) {
-            return $this->_matchRule($path, $rule);
+        if ( is_string($rules)) {
+            return $this->__matchRule($path, $rules);
         }
 
-        if ( is_array($rule)) {
-            foreach ($rule as $r) {
-                if ( $this->_matchRule($path, $r)) {
+        if ( is_array($rules)) {
+            foreach ($rules as $rule) {
+                if ( $this->__matchRule($path, $rule)) {
                     return true;
                 }
             }
@@ -3182,32 +3453,56 @@ class Acl
 
         return false;
     }
-    private function _matchRule($path, $rule)
+
+    /**
+     * Check if $path matches $rule
+     *
+     * @param string $path The path to be check.
+     * @param string $rule The rule, can be `*`, `{controller}/*` or `{controller}/{action}`.
+     * @return boolean
+     */
+    private function __matchRule($path, $rule)
     {
+        // $rule = '*'
         if ('*' === $rule) {
             return true;
         }
+
+        // $rule = '{controller}'
         if ( false === strpos($rule, '/')) {
             return ($path === $rule);
         }
 
+        // $rule = '{controller}/{action}'
         list($rController, $rAction) = explode('/', $rule);
         if ('*' !== $rAction) {
             return ($path === $rule);
         }
 
+        // $rule = '{controller}/*'
         list($controller) = explode('/', $path);
 
         return ($controller === $rController);
     }
 
+    /**
+     * Get current role
+     *
+     * @return string
+     */
     public function getRole()
     {
-        return $this->_role;
+        return $this->__role;
     }
+    /**
+     * Set current role
+     *
+     * @param string $role The role name.
+     * @return void
+     */
     public function setRole($role)
     {
-        $this->_role = $role;
+        $this->__role = $role;
     }
 
 } // END class
@@ -3257,8 +3552,9 @@ class I18N
     /**
      * Load another PO File
      *
-     * @param array $config {{@see I18N::__construct()}}
+     * @param array $config {@see I18N::__construct()}
      * @return void
+     * @see I18N::__construct() I18N::__construct()
      */
     public function loadTextDomain($config)
     {
