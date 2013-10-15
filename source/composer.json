@@ -6,7 +6,7 @@
       }
   ],
   "require": {
-    "php": ">=5.2",
+    "php": ">=5.1",
     "beata/pomo": "dev-master",
     "beata/upgradephp": "v18.1.0",
     "ezyang/htmlpurifier": "v4.5"
