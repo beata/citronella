@@ -28,7 +28,11 @@ class NotFoundException extends Exception
         if (!$message) {
             $message = __('頁面不存在');
         }
-        parent::__construct($message, $code, $previous);
+        if (phpversion() < 5.3) {
+            parent::__construct($message, $code);
+        } else {
+            parent::__construct($message, $code, $previous);
+        }
     }
 }
 
@@ -531,11 +535,8 @@ abstract class Controller
             $backLink = false;
         }
 
-        if ($backLink) {
-            $content = '<div>' . $content . '</div>'
-                . '<div class="alert-actions"><a href="javascript:window.history.back(-1)" class="btn btn-medium">' . _e('返回上一頁') . '</a></div>';
-        }
         $this->data['content'] = $content;
+        $this->data['backLink'] = $backLink;
         $this->_prepareLayout();
         $appId = 'common';
         $layoutAppId = NULL;
@@ -636,8 +637,26 @@ abstract class BaseController extends Controller
             }
             $response = array( 'error' => array( 'message' => $ex->getMessage() ) );
         }
-        header('Content-Type: text/plain; charset="' . App::conf()->encoding . '"');
+
+        $this->_setJSONHeader();
         echo json_encode($response);
+    }
+
+    /**
+     * Set http header for json response.
+     *
+     * @return void
+     */
+    public function _setJSONHeader()
+    {
+        header('Vary: Accept');
+        if (isset($_SERVER['HTTP_ACCEPT']) &&
+            (strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)) {
+            $mime = 'application/json';
+        } else {
+            $mime = 'text/plain';
+        }
+        header('Content-Type: ' . $mime . '; charset="' . App::conf()->encoding . '"');
     }
 
     /**
@@ -667,6 +686,41 @@ abstract class BaseController extends Controller
             }
         }
     }
+    /**
+     * Can be called in either
+     *
+     * _handlePost([$module,] $action[, $methodName], $args)
+     *
+     * @return void
+     */
+    public function _handlePost($module, $action=NULL, $method=NULL, $args=array())
+    {
+        if (is_string($module)) {
+            $args = $method;
+            $method = $action;
+            $action = $module;
+            $module = NULL;
+        }
+        if (!isset($_POST['action']) || $action !== $_POST['action']) {
+            return;
+        }
+        if (is_array($method)) {
+            $args = $method;
+        } elseif ($method) {
+            $action = $method;
+        }
+        try {
+            $method = '_handlePost' . camelize($action, true);
+            $object = ($module ? $module : $this);
+            if (is_array($args)) {
+                call_user_func_array(array($object, $method), $args);
+            }
+            $object->{$method}();
+        } catch (Exception $ex) {
+            $this->data['error'] = $ex->getMessage();
+        }
+    }
+
 } // END class
 
 /**
@@ -682,6 +736,7 @@ abstract class Module
      * @var Controller
      */
     protected $c;
+    protected $_defaultAction = 'index';
 
     /**
      * Constructor
@@ -698,6 +753,15 @@ abstract class Module
                 $this->{$key} = $value;
             }
         }
+    }
+    public function doAction()
+    {
+        $action = camelize(App::urls()->segment($this->_baseUrlPos+1, $this->_defaultAction), true);
+
+        if ( !method_exists($this, 'action' . $action)) {
+            throw new NotFoundException;
+        }
+        $this->{'action' . $action}();
     }
 }
 
@@ -723,6 +787,8 @@ abstract class Model
      * @var boolean
      */
     protected $_forceInsert = FALSE;
+
+    protected $_autoLastInsertId = TRUE;
 
     /**
      * Model Configuration
@@ -821,6 +887,10 @@ abstract class Model
         }
     }
 
+    public function setForceInsert($forceInsert=TRUE)
+    {
+        $this->_forceInsert = $forceInsert;
+    }
     /**
      * Insert a record for current model
      *
@@ -845,13 +915,15 @@ abstract class Model
         DBHelper::bindArrayValue($stmt, $params);
         $stmt->execute();
 
-        if ( ! is_array($this->_config['primaryKey'])) {
-            $this->{$this->_config['primaryKey']} = $db->lastInsertId();
+        if ($this->_autoLastInsertId) {
+            if ( ! is_array($this->_config['primaryKey'])) {
+                $this->{$this->_config['primaryKey']} = $db->lastInsertId();
 
-            return;
-        }
-        if ( in_array('id', $this->_config['primaryKey']) && ! $this->id) {
-            $this->id = $db->lastInsertId();
+                return;
+            }
+            if ( in_array('id', $this->_config['primaryKey']) && ! $this->id) {
+                $this->id = $db->lastInsertId();
+            }
         }
     }
 
@@ -1213,6 +1285,9 @@ class View
 
         $this->data = $data;
 
+        if ( file_exists($this->__getDir($layoutAppId) . 'functions.php')) {
+            include $this->__getDir($layoutAppId) . 'functions.php';
+        }
         if ( file_exists($this->__getDir($layoutAppId) . $layout . '_functions.php')) {
             include $this->__getDir($layoutAppId) . $layout . '_functions.php';
         }
@@ -1285,8 +1360,8 @@ class View
      */
     public function showAddon($addonName)
     {
-        if ( isset($this->_addons[$addonName])) {
-            echo implode("\n", $this->_addons[$addonName]);
+        if ( isset($this->__addons[$addonName])) {
+            echo implode("\n", $this->__addons[$addonName]);
         }
     }
 
@@ -1298,7 +1373,7 @@ class View
      */
     public function hasAddon($addonName)
     {
-        return isset($this->_addons[$addonName]);
+        return isset($this->__addons[$addonName]);
     }
 } // END class
 
@@ -1352,6 +1427,9 @@ class Search
      */
     public $limit;
 
+    public $having = array();
+    public $havingParams = array();
+
     /**
      * Returns sql WHERE string from $this->where
      *
@@ -1360,6 +1438,53 @@ class Search
     public function sqlWhere()
     {
         return sizeof($this->where) ? ' WHERE ' . implode(' AND ', $this->where) : '';
+    }
+    public function where($field, $value=NULL)
+    {
+        if (!is_array($field)) {
+            $this->where[] = '`' . $field . '` = ?';
+            $this->params[] = $value;
+        } else {
+            foreach ($field as $column => $value) {
+                $this->where[] = '`' . $column . '` = ?';
+                $this->params[] = $value;
+            }
+        }
+        return $this;
+    }
+    public function having($field, $value=NULL)
+    {
+        if (!is_array($field)) {
+            $this->having[] = '`' . $field . '` = ?';
+            $this->havingParams[] = $value;
+        } else {
+            foreach ($field as $column => $value) {
+                $this->having[] = '`' . $column . '` = ?';
+                $this->havingParams[] = $value;
+            }
+        }
+        return $this;
+    }
+
+    public function sqlPagerInfo()
+    {
+        $pagerInfo = '';
+        if (!empty($this->groupBy)) {
+            $pagerInfo .= ' GROUP BY ' . $this->groupBy;
+        }
+        if (!empty($this->having)) {
+            $pagerInfo .= ' HAVING ' . $this->sqlHaving();
+            $params = array_merge($params, $this->havingParams);
+        }
+        if (!empty($this->orderBy)) {
+            $pagerInfo .= ' ORDER BY ' . $this->orderBy;
+        } elseif (isset($mconf['primaryKey'])) {
+            $pagerInfo .= ' ORDER BY ' . self::__orderByPrimaryKey($mconf['primaryKey']);
+        }
+        if (!empty($this->limit)) {
+            $pagerInfo .= ' LIMIT ' . $this->limit;
+        }
+        return $pagerInfo;
     }
 }
 
@@ -1647,17 +1772,14 @@ class DBHelper
         if (NULL !== $pager) {
             $pagerInfo = $pager->getSqlGroupBy() . $pager->getSqlOrderBy() . $pager->getSqlLimit();
         } else {
-            $pagerInfo = '';
-            if (!empty($search->groupBy)) {
-                $pagerInfo .= ' GROUP BY ' . $search->groupBy;
+            if (empty($search->orderBy) && isset($mconf['primaryKey'])) {
+                $search->_origOrderBy = $search->orderBy;
+                $search->orderBy = self::__orderByPrimaryKey($mconf['primaryKey']);
             }
-            if (!empty($search->orderBy)) {
-                $pagerInfo .= ' ORDER BY ' . $search->orderBy;
-            } elseif (isset($mconf['primaryKey'])) {
-                $pagerInfo .= ' ORDER BY `' . $mconf['primaryKey'] . '` ASC';
-            }
-            if (!empty($search->limit)) {
-                $pagerInfo .= ' LIMIT ' . $search->limit;
+            $pagerInfo = $search->sqlPagerInfo();
+            if (property_exists($search, '_origOrderBy')) { // restore to original orderBy value.
+                $search->orderBy = $search->_origOrderBy;
+                unset($search->_origOrderBy);
             }
         }
 
@@ -1665,6 +1787,25 @@ class DBHelper
         $stmt->execute($params);
 
         return $stmt;
+    }
+
+    private static function __orderByPrimaryKey($primaryKey)
+    {
+        if (!is_array($primaryKey)) {
+            return '`' . $primaryKey . '` ASC';
+        }
+
+        $sql = '';
+        $hasFirst = NULL;
+        foreach ($primaryKey as $field)  {
+            if ($hasFirst) {
+                $sql .= ',';
+            } else {
+                $hasFirst = TRUE;
+            }
+            $sql .= ' `' . $field . '` ASC';
+        }
+        return $sql;
     }
 
     /**
@@ -1790,6 +1931,27 @@ class DBHelper
         $model = new $model;
         return $model->fields($for, $search);
     }
+
+    /**
+     * Get instance config
+     *
+     * @param string $model The class name of the model
+     * @param string $key The access key of the value in the model configuration.
+     * @return mixed
+     */
+    public static function modelConfig($model, $key=NULL)
+    {
+        $model = new $model;
+
+        if (!is_array($key)) {
+            return $model->getConfig($key);
+        }
+        $config = new stdclass;
+        foreach ($key as $k) {
+            $config->{$k} = $model->getConfig($k);
+        }
+        return $config;
+    }
     /**
      * Translate search argument to sql statement.
      *
@@ -1829,7 +1991,7 @@ class DBHelper
             return;
         }
         foreach ($data->_new_files as $file) {
-            if ( file_exists($file)) {
+            if ( '' !== (string)$file && file_exists($file)) {
                 unlink($file);
             }
         }
@@ -1869,6 +2031,9 @@ class DBHelper
         }
         while ( $item = $stmt->fetchObject()) {
             foreach ($columns as $column) {
+                if (!$item->{$column}) {
+                    continue;
+                }
                 $delFileOpts = array(
                     'data' => $item,
                     'column' => $column,
@@ -2009,6 +2174,8 @@ class Validator
      * `[fileKey]` string Optional Default: `$key` <br />
      *  - Alternative file key of $_FILES (e.g: `$_FILES[$fileKey]['tmp_name']`) <br /><br />
      *
+     * `[fileKeyIdx]` integer Optional Default: FALSE<br /><br />
+     *
      * `[rename]` boolean|string Optional Default: `TRUE`<br />
      *  - Whether or not to rename the uploaded file, if set to `TRUE`, an auto-generated file name will be used.<br /><br />
      *
@@ -2038,10 +2205,10 @@ class Validator
      * `[max_size]` integer Optional<br />
      *  - Restrict file size of uploaded file in kilobytes.<br /><br />
      *
-     * `[crop]` boolean Optional Default: false<br />
+     * `[crop]` boolean Default: false<br />
      *  - Whether or not to crop when image dimensions exceed. Only works when `[method]` hasn't been set.<br /><br />
      *
-     * `[cropOrigin]` string Optional Default: `center`<br />
+     * `[cropOrigin]` string Default: `center`<br />
      *  - available values are: `center` or `top`<br /><br />
      *
      * `[method]` string Optional<br />
@@ -2049,8 +2216,8 @@ class Validator
      *
      * `[thumbnails]` array Optional<br />
      *  ---- `[{suffix}]` array Thumbnail options<br />
-     *  -------- `[method]` string<br />
-     *  -------- `[crop]` boolean<br />
+     *  -------- `[method]` string Optional<br />
+     *  -------- `[crop]` boolean Default:false<br />
      *  -------- `[size]` array Same as `[resize]`<br />
      *  -------- `[cropOrigin]` string<br /><br /><br />
      *
@@ -2082,9 +2249,11 @@ class Validator
                 switch ($opt['type']) {
                     case 'image':   // handle uploaded image
                         self::__verifySaveImage($data, $key, $opt, $input);
+                        $is_empty = empty($data->{$key});
                         break;
                     case 'file':    // handle uploaded file
                         self::__verifySaveFile($data, $key, $opt, $input);
+                        $is_empty = empty($data->{$key});
                         break;
                     case 'boolean':
                         $data->{$key} = (isset($input[$key]) ? (int) (boolean) $input[$key] : '0');
@@ -2234,97 +2403,107 @@ class Validator
         }
         App::loadHelper('GdImage', false, 'common');
 
-        $fileKey = ! empty($opt['fileKey']) ? $opt['fileKey'] : $key;
+        $fileKey = (!empty($opt['fileKey']) ? $opt['fileKey'] : $key);
+        $fileKeyIdx = (array_key_exists('fileKeyIdx', $opt) ? $opt['fileKeyIdx'] : FALSE);
+
+        // file upload
+        $gd = new GdImage( $opt['dir'], $opt['dir'] );
 
         // file is not uploaded.
-        if ( empty($_FILES[$fileKey]['name'])) {
+        if (!$gd->hasSubmitImage($fileKey, $fileKeyIdx)) {
             $input[$key] = $data->{$key};
             return;
         }
 
-        // file upload
-        $gd = new GdImage( $opt['dir'], $opt['dir'] );
-        $gd->generatedType = strtolower(pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION));
+        $gd->generatedType = $gd->getUploadExtension($fileKey, $fileKeyIdx);
 
         // check upload error
-        App::loadHelper('Upload', false, 'common');
-        $uploader = new Upload(NULL, NULL);
-        $uploader->checkError($_FILES[$fileKey]['error']);
-        unset($uploader);
+        $gd->checkUploadError($fileKey, $fileKeyIdx);
 
         // validate image
-        if ( ! $gd->checkImageExtension($fileKey)) {
+        if ( ! $gd->checkImageExtension($fileKey, $fileKeyIdx)) {
             throw new ValidatorException(sprintf(
                     _e('%s: 圖片類型只能是 jpg, png, gif'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
         }
 
-        if ( ! $gd->checkImageType($fileKey)) {
+        if ( ! $gd->checkImageType($fileKey, $fileKeyIdx)) {
             throw new ValidatorException(sprintf(
                     _e('%s: 圖片類型只能是 jpg, png, gif'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
 
         }
-        if ( ! $gd->checkImageSize($fileKey, $opt['max_size'])) {
+        if ( ! $gd->checkImageSize($fileKey, $fileKeyIdx, $opt['max_size'])) {
             throw new ValidatorException(sprintf(
                     _e('%s: 圖片檔案大小不能超過 %sK'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>',
                     $opt['max_size'] ));
         }
-        if ( ! $source = $gd->uploadImage($fileKey)) {
+
+        if ( ! $gd->checkImageContent($fileKey, $fileKeyIdx)) {
+            throw new ValidatorException(sprintf(
+                    _e('%s: 無法解讀的圖片內容'),
+                    '<strong>' . HtmlValueEncode($label) . '</strong>' ));
+        }
+
+        // upload
+        if ( ! $source = $gd->uploadImage($fileKey, $fileKeyIdx)) {
             throw new ValidatorException(sprintf(
                     _e('%s: 圖片上傳失敗，請稍後再上傳一次'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>'));
         }
         $data->_new_files[] = $opt['dir'] . $source;
 
-        // remove old file
+        // delete original file.
         if ($data->{$key}) {
             DBHelper::deleteFile(array(
                 'data' => $data,
                 'column' => $key,
                 'dir' => $gd->processPath,
-                'suffixes' => array_keys($opt['thumbnails'])
+                'suffixes' => (isset($opt['thumbnails']) ? array_keys($opt['thumbnails']) : array())
             ));
             $data->{$key} = $input[$key] = '';
         }
 
-        if (!isset($opt['method'])) {
-            $method = empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
-        } else {
-            $method = $opt['method'];
-        }
+        // resize image
         $info = pathinfo($source);
         if ( !isset($info['filename'])) { // < php5.2.0
             $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
         }
         $filename = $info['filename'];
-        $ext = strtolower($info['extension']);
+        unset($info);
+
+        $method = self::__saveImage__resizeMethod($opt);
         $gd->{$method}(
             $source,
             $opt['resize'][0], $opt['resize'][1],
             $filename,
-            (isset($opt['cropOrigin']) ? $opt['cropOrigin'] : null)
+            (isset($opt['cropOrigin']) ? $opt['cropOrigin'] : NULL)
         );
         $data->{$key} = $input[$key] = $source;
 
         if ( isset($opt['thumbnails'])) {
             foreach ($opt['thumbnails'] as $suffix => $sOpt) {
                 $sOpt = (array) $sOpt;
-                if (!isset($sOpt['method'])) {
-                    $method = empty($sOpt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess';
-                } else {
-                    $method = $sOpt['method'];
-                }
+
+                $method = self::__saveImage__resizeMethod($sOpt);
                 $gd->{$method}(
                     $source,
                     $sOpt['size'][0], $sOpt['size'][1],
                     $filename . $suffix,
-                    (isset($sOpt['cropOrigin']) ? $sOpt['cropOrigin'] : null)
+                    (isset($sOpt['cropOrigin']) ? $sOpt['cropOrigin'] : NULL)
                 );
-                $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $ext;
+                $data->_new_files[] = $opt['dir'] . $filename . $suffix . '.' . $gd->generatedType;
             }
         }
+    }
+
+    private static function __saveImage__resizeMethod($opt)
+    {
+        if (isset($opt['method'])) {
+            return $opt['method'];
+        }
+        return (empty($opt['crop']) ? 'createThumb' : 'adaptiveResizeCropExcess');
     }
     /**
      * Stores uploaded file and assign file name to $data->{$key}
@@ -2655,7 +2834,7 @@ class Validator
      * @return string $value
      * @throws ValidatorException if the value is not valid.
      */
-    public static function NullOrHasRecord($value, $model, $search=NULL)
+    public static function nullOrHasRecord($value, $model, $search=NULL)
     {
         if (NULL === $value) {
             return $value;
@@ -2685,10 +2864,10 @@ class Validator
 
         // Search primaryKey=$value
         if ( is_object($search) && $search instanceof Search) {
-            array_unshift($search->where, $mconf['primaryKey']);
+            array_unshift($search->where, $mconf['primaryKey'] . ' = ?');
             array_unshift($search->params, $value);
         } elseif ( is_array($search) ) {
-            array_merge(array($mconf['primaryKey'] => $value), $search);
+            $search = array_merge(array($mconf['primaryKey'] => $value), $search);
         } else {
             $search = $value;
         }
@@ -2699,6 +2878,58 @@ class Validator
 
         return $value;
     }
+
+    /**
+     * Check if the value is duplicated.
+     *
+     * @param string $value The value to be checked
+     * @param Model $modelObj The model instance.
+     * @param string $valueField The field name of $value
+     * @return string $value
+     * @throws ValidatorException if the value is not valid.
+     */
+    public static function isUniq($value, $modelObj, $valueField, $search=NULL)
+    {
+        $mconf = $modelObj->getConfig();
+
+        if (!is_object($search) || !($search instanceof Search)) {
+            $search = new Search;
+        }
+        // Search $valueField = $value
+        array_unshift($search->where, '`' . $valueField  . '` = ?');
+        array_unshift($search->params, $value);
+
+        // Search id != $modelObj.id
+        if ($modelObj->hasPrimaryKey()) {
+            array_unshift($search->where, $mconf['primaryKey'] . ' != ?');
+            array_unshift($search->params, $modelObj->{$mconf['primaryKey']});
+        }
+
+        if ( DBHelper::count(get_class($modelObj), $search) ) {
+            throw new ValidatorException(__('已有資料'));
+        }
+
+        return $value;
+    }
+
+    /**
+     * Check if the value is duplicated.
+     *
+     * @param string $value The value to be checked
+     * @param Model $modelObj The model instance.
+     * @param string $valueField The field name of $value
+     * @return string $value
+     * @throws ValidatorException if the value is not valid.
+     */
+    public static function nullOrIsUniq($value, $modelObj, $valueField)
+    {
+        if (NULL === $value) {
+            return $value;
+        }
+
+        return self::isUniq($value, $modelObj, $valueField);
+    }
+
 
     /**
      * Check if the value matches pattern
@@ -2713,6 +2944,16 @@ class Validator
     {
         if (!preg_match($pattern, $value)) {
             throw new ValidatorException($title);
+        }
+        return $value;
+    }
+    public static function captcha($value, $sessionKey='turing_string')
+    {
+        if (
+            !isset($_SESSION[$sessionKey]) ||
+            (strtoupper($value) !== strtoupper($_SESSION[$sessionKey]))
+        ) {
+            throw new ValidatorException(__('驗證碼錯誤'));
         }
         return $value;
     }
@@ -3255,8 +3496,8 @@ class Route
     public function forwardTo($controller, $action)
     {
         $this->addHistory($controller, $action);
-        self::acl()->check();
-        self::doAction($_REQUEST['controller'], $_REQUEST['action']);
+        App::acl()->check();
+        App::doAction($_REQUEST['controller'], $_REQUEST['action']);
     }
 
     /**
@@ -3613,7 +3854,10 @@ class I18N
  */
 function __($message)
 {
-    return $message;
+    if (!App::conf()->enable_i18n) {
+        return $message;
+    }
+    return App::i18n()->getTranslation()->translate($message);
 }
 
 /**

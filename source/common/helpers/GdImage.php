@@ -117,8 +117,13 @@ class GdImage
      * @param  string   $file File name of the image
      * @return resource
      */
-    protected function createImageObject(&$img, $type, $file)
+    protected function createImageObject(&$img, $type=NULL, $file)
     {
+        if (NULL === $type) {
+            $imginfo = $this->getInfo($file);
+            $type = $imginfo['type'];
+        }
+
         switch ($type) {
             case 1:
                 $img = imagecreatefromgif($file);
@@ -290,7 +295,7 @@ class GdImage
         $oriH = $imginfo['height'];
 
         //maintain ratio
-        if($oriW*$width > $oriH*$height)
+        if($oriW/$width > $oriH/$height)
             $height = round($oriH * $width/$oriW);
         else
             $width = round($oriW * $height/$oriH);
@@ -807,6 +812,7 @@ class GdImage
         }
     }
 
+
     /**
      * Get the info of an image
      *
@@ -825,189 +831,376 @@ class GdImage
         return $img;
     }
 
+
+
+    // Handle File Uploads
     /**
      * Save the uploaded image(s) in HTTP File Upload variables
      *
-     * @param  string       $filename The file field name in $_FILES HTTP File Upload variables
+     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
      * @param  string       $rename   Rename the uploaded file (without extension)
      * @return string|array The file name of the uploaded image.
      */
-    public function uploadImage($filename, $rename='')
+    public function uploadImage($fileKey, $fileKeyIdx=FALSE, $rename='')
     {
-        $img = !empty($_FILES[$filename]) ? $_FILES[$filename] : null;
-        if($img==Null)return;
+        if (empty($_FILES[$fileKey])) {
+            return false;
+        }
 
+        $img = $_FILES[$fileKey];
+
+        // create folder if not exists
         if (!file_exists($this->uploadPath)) {
             App::loadHelper('File', false, 'common');
             $fileManager = new File(0777);
             $fileManager->create($this->uploadPath);
         }
 
-        if (is_array($img['name'])===False) {
-            $basename = basename($img['name']);
-            $ext = pathinfo($basename, PATHINFO_EXTENSION);
-            $ext = '' === $ext ? '' : '.' . strtolower($ext);
-
-            if ($this->timeAsName) {
-                $newName = time() . '-' . mt_rand(1000,9999) . $ext;
-            } else {
-                $newName = $basename;
+        if (!is_array($img['error'])) {
+            $uploadInfo = $img;
+            return $this->__handleUpload($uploadInfo, $rename);
+        } elseif (FALSE !== $fileKeyIdx) {
+            $uploadInfo = array();
+            foreach (array('name', 'type', 'tmp_name', 'error', 'size') as $col) {
+                $uploadInfo[$col] = $img[$col][$fileKeyIdx];
             }
-
-            $filename = (($rename=='') ? $newName : $rename . $ext);
-            $imgPath = $this->uploadPath . $filename;
-
-            if (move_uploaded_file($img['tmp_name'], $imgPath)) {
-                $this->fixOrientation($imgPath);
-
-                return $filename;
-            }
+            return $this->__handleUpload($uploadInfo, $rename);
         } else {
-            $uploadedImages = array();
-            foreach ($img['error'] as $k=>$error) {
-                if(empty($img['name'][$k])) continue;
-                if ($error == UPLOAD_ERR_OK) {
-
-                    $basename = basename($img['name'][$k]);
-                    $ext = pathinfo($basename, PATHINFO_EXTENSION);
-                    $ext = '' === $ext ? '' : '.' . strtolower($ext);
-
-                   if ($this->timeAsName) {
-                       $newName = time().'-'.mt_rand(1000,9999) . '_' . $k . $ext;
-                   } else {
-                       $newName = $basename;
-                   }
-
-                   $filename = ('' == $rename ? $newName : $rename . '_' . $k . $ext);
-                   $imgPath = $this->uploadPath . $filename;
-
-                   if (move_uploaded_file($img['tmp_name'][$k], $imgPath)) {
-                       $this->fixOrientation($imgPath);
-                       $uploadedImages[] = $filename;
-                   }
-                } else {
-                   return false;
+            $result = array();
+            foreach ($img['error'] as $idx => $error) {
+                $uploadInfo = array();
+                $uploadInfo['__index'] = $idx;
+                foreach (array('name', 'type', 'tmp_name', 'error', 'size') as $col) {
+                    $uploadInfo[$col] = $img[$col][$idx];
                 }
+                $result[$idx] = $this->__handleUpload($uploadInfo, $rename);
             }
-
-            return $uploadedImages;
+            return $result;
         }
     }
 
+    private function __handleUpload($uploadInfo, $rename='')
+    {
+        if (!$uploadInfo['name'] || UPLOAD_ERR_OK != $uploadInfo['error']) {
+            return NULL;
+        }
+
+        $basename = basename($uploadInfo['name']);
+        $ext = self::__getExtension($basename);
+        $ext = ('' === $ext ? '' : '.' . strtolower($ext));
+
+        if (isset($uploadInfo['__index'])) {
+            $suffix = '_' . $uploadInfo['__index'];
+        } else {
+            $suffix = '';
+        }
+
+        if ($this->timeAsName) {
+            $newName = time() . '-' . mt_rand(1000,9999) . $suffix . $ext;
+        } else {
+            $newName = $basename;
+        }
+
+        $filename = (('' == $rename) ? $newName : $rename . $suffix . $ext);
+        $imgPath = $this->uploadPath . $filename;
+
+        if (move_uploaded_file($uploadInfo['tmp_name'], $imgPath)) {
+            $this->afterUpload($imgPath);
+            return $filename;
+        }
+    }
+
+    public function getUploadExtension($fileKey, $fileKeyIdx=FALSE)
+    {
+        $nameData = $_FILES[$fileKey]['name'];
+
+        if (!is_array($nameData))  {
+            return self::__getExtension($nameData);
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($nameData[$fileKeyIdx])) {
+                return NULL;
+            }
+            $nameData = $nameData[$fileKeyIdx];
+            return self::__getExtension($nameData);
+        }
+
+        $result = array();
+        foreach ($nameData as $idx => $name) {
+            $result[$idx] = self::__getExtension($name);
+        }
+        return $result;
+    }
+
+    private static function __getExtension($filename)
+    {
+        return ($filename ? strtolower(pathinfo($filename, PATHINFO_EXTENSION)) : '');
+    }
     /**
      * Get the uploaded images' format type
      *
-     * @param  string       $filename The file field name in $_FILES HTTP File Upload variables
+     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
      * @return string|array The image format type of the uploaded image.
      */
-    public function getUploadFormat($filename)
+    public function getUploadFormat($fileKey, $fileKeyIdx=FALSE)
     {
-        if (!empty($_FILES[$filename])) {
-            $type = $_FILES[$filename]['type'];
-            if (is_array($type)===False) {
-                if(!empty($type))
+        $typeData = $_FILES[$fileKey]['type'];
 
-                    return str_replace('image/', '', $type);
-            } else {
-                $typelist = array();
-                foreach ($type as $t) {
-                    $typelist[] = str_replace('image/', '', $t);
-                }
-
-                return $typelist;
-            }
+        if (!is_array($typeData))  {
+            return self::__getType($typeData);
         }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($typeData[$fileKeyIdx])) {
+                return NULL;
+            }
+            $typeData = $typeData[$fileKeyIdx];
+            return self::__getType($typeData);
+        }
+
+        $result = array();
+        foreach ($typeData as $idx => $type) {
+            $result[$idx] = self::__getType($type);
+        }
+        return $result;
+    }
+
+    private static function __getType($mime)
+    {
+        return ($mime ? str_replace('image/', '', $mime) : NULL);
     }
 
     /**
-     * Checks if image mime type of the uploaded file(s) is in the allowed list
-     * @param  string $filename  The file field name in $_FILES HTTP File Upload variables
-     * @param  array  $allowType Allowed image format type. Default: JPEGs, GIFs and PNGs
-     * @return bool   Returns true if image mime type is in the allowed list.
+     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
+     * @return string|array The image format size of the uploaded image.
      */
-    public function checkImageType($filename, $allowType=array('jpg','jpeg','pjpeg','gif','png','x-png'))
+    public function getUploadSize($fileKey, $fileKeyIdx=FALSE)
     {
-        $type = $this->getUploadFormat($filename);
-        if(is_array($type)===False)
+        $sizeData = $_FILES[$fileKey]['size'];
 
-            return in_array($type, $allowType);
-        else{
-            foreach ($type as $t) {
-                if($t===Null || $t==='') continue;
-                if (!in_array($t, $allowType)) {
-                    return false;
-                }
+        if (!is_array($sizeData))  {
+            return $sizeData;
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($sizeData[$fileKeyIdx])) {
+                return NULL;
             }
+            $sizeData = $sizeData[$fileKeyIdx];
+            return $sizeData;
+        }
 
-            return true;
+        $result = array();
+        foreach ($sizeData as $idx => $size) {
+            $result[$idx] = $size;
+        }
+        return $result;
+    }
+
+    public function getUploadTmpName($fileKey, $fileKeyIdx=FALSE)
+    {
+        $tmpNameData = $_FILES[$fileKey]['tmp_name'];
+
+        if (!is_array($tmpNameData))  {
+            return $tmpNameData;
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($tmpNameData[$fileKeyIdx])) {
+                return NULL;
+            }
+            $tmpNameData = $tmpNameData[$fileKeyIdx];
+            return $tmpNameData;
+        }
+
+        $result = array();
+        foreach ($tmpNameData as $idx => $tmpName) {
+            $result[$idx] = $tmpName;
+        }
+        return $result;
+    }
+
+
+
+    public function hasSubmitImage($fileKey, $fileKeyIdx=FALSE)
+    {
+        if (!isset($_FILES[$fileKey]['name'])) {
+            return false;
+        }
+        $nameData = $_FILES[$fileKey]['name'];
+
+        if (!is_array($nameData))  {
+            return !empty($nameData);
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            return !empty($nameData[$fileKeyIdx]);
+        }
+
+        $result = array();
+        foreach ($nameData as $idx => $name) {
+            $result[$idx] = !empty($name);
+        }
+        return $result;
+    }
+    public function checkUploadError($fileKey, $fileKeyIdx=FALSE)
+    {
+        App::loadHelper('Upload', false, 'common');
+        $uploader = new Upload(NULL, NULL);
+
+        $errorData = $_FILES[$fileKey]['error'];
+
+        if (!is_array($errorData))  {
+            return $uploader->checkError($errorData);
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($errorData[$fileKeyIdx])) {
+                return NULL;
+            }
+            $errorData = $errorData[$fileKeyIdx];
+            return $uploader->checkError($errorData);
+        }
+
+        $result = array();
+        foreach ($errorData as $idx => $error) {
+            try {
+                $uploader->checkError($error);
+            } catch (Exception $ex) {
+                $result[$idx] = '[' . $idx . '] ' . $ex->getMessage();
+            }
+        }
+
+        if (!empty($result)) {
+            throw new UploadException(implode("\n", $result));
         }
     }
 
     /**
      * Checks if image extension of the uploaded file(s) is in the allowed list.
      *
-     * @param  string $filename The file input field name in $_FILES HTTP File Upload variables
+     * @param  string $fileKey The file input field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
      * @param  array  $allowExt Allowed file extensions. Default: jpg, jpeg, gif, png
      * @return bool   Returns true if file extension is in the allowed list.
      */
-    public function checkImageExtension($filename, $allowExt=array('jpg','jpeg','gif','png'))
+    public function checkImageExtension($fileKey, $fileKeyIdx=FALSE, $allowExt=array('jpg','jpeg','gif','png'))
     {
-        if (!empty($_FILES[$filename])) {
-            $name = $_FILES[$filename]['name'];
-            if (is_array($name)===False) {
-                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-
-                return in_array($ext, $allowExt);
-            } else {
-                foreach ($name as $nm) {
-                    $ext = strtolower(pathinfo($nm, PATHINFO_EXTENSION));
-                    if (!in_array($ext, $allowExt)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
+        $extData = $this->getUploadExtension($fileKey, $fileKeyIdx);
+        if (!is_array($extData)) {
+            return in_array($extData, $allowExt);
         }
+
+        $result = array();
+        foreach ($extData as $idx => $ext) {
+            $result[$idx] = in_array($extData, $allowExt);
+        }
+        return $result;
     }
+
+    /**
+     * Checks if image mime type of the uploaded file(s) is in the allowed list
+     * @param  string $fileKey  The file field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
+     * @param  array  $allowType Allowed image format type. Default: JPEGs, GIFs and PNGs
+     * @return bool   Returns true if image mime type is in the allowed list.
+     */
+    public function checkImageType($fileKey, $fileKeyIdx=FALSE, $allowType=array('jpg','jpeg','pjpeg','gif','png','x-png'))
+    {
+        $typeData = $this->getUploadFormat($fileKey, $fileKeyIdx);
+        if (!is_array($typeData)) {
+            return in_array($typeData, $allowType);
+        }
+
+        $result = array();
+        foreach ($typeData as $idx => $type) {
+            $result[$idx] = in_array($typeData, $allowType);
+        }
+        return $result;
+    }
+
 
     /**
      * Checks if image file size does not exceed the max file size allowed.
      *
-     * @param  string $filename The file input field name in $_FILES HTTP File Upload variables
+     * @param  string $fileKey The file input field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
      * @param  int    $maxSize  Allowed max file size in kilo bytes.
      * @return bool   Returns true if file size does not exceed the max file size allowed.
      */
-    public function checkImageSize($filename, $maxSize)
+    public function checkImageSize($fileKey, $fileKeyIdx=FALSE, $maxSize)
     {
-        if (!empty($_FILES[$filename])) {
-            $size = $_FILES[$filename]['size'];
-            if (is_array($size)===False) {
-                if (($size/1024)>$maxSize) {
-                    return false;
-                }
-            } else {
-                foreach ($size as $s) {
-                    if (($s/1024)>$maxSize) {
-                        return false;
-                    }
-                }
-            }
+        $sizeData = $this->getUploadSize($fileKey, $fileKeyIdx);
 
-            return true;
+        $maxSize = $maxSize * 1024;
+
+        if (!is_array($sizeData)) {
+            return ($sizeData <= $maxSize);
         }
+
+        $result = array();
+        foreach ($sizeData as $idx => $size) {
+            $result[$idx] = ($size <= $maxSize);
+        }
+        return $result;
     }
 
-    public function fixOrientation($filepath)
+    /**
+     * @param  string $fileKey The file input field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
+     * @return bool
+     */
+    public function checkImageContent($fileKey, $fileKeyIdx=FALSE)
     {
-        $exif = exif_read_data($filepath);
-        if (empty($exif['Orientation'])) {
-            return $filepath;
+        $tmpNameData = $this->getUploadTmpName($fileKey, $fileKeyIdx);
+
+        if (!is_array($tmpNameData)) {
+            return (false !== getimagesize($tmpNameData));
         }
 
+        $result = array();
+        foreach ($tmpNameData as $idx => $tmpName) {
+            $result[$idx] = (false !== getimagesize($tmpName));
+        }
+        return $result;
+    }
+
+
+
+    public function afterUpload($imgPath)
+    {
+        $img = $this->createImageObject($img, NULL, $imgPath);
+        if (!$img) {
+            return false;
+        }
+
+        $this->__imgFixOrientation($img, $imgPath);
+
+        if (file_exists($imgPath)) {
+            unlink($imgPath);
+        }
+        $this->generateImage($img, $imgPath);
+
+        imagedestroy($img);
+
+        return $imgPath;
+    }
+
+    private function __imgFixOrientation(&$img, $filepath)
+    {
         $imginfo = $this->getInfo($filepath);
-        $this->createImageObject($img, $imginfo['type'], $filepath);
-        if (!$img) return false;
+        $type = $imginfo['type'];
+        if (
+            !in_array($imginfo['type'], array('image/jpeg', 'image/jpg')) ||
+            ! ($exif = exif_read_data($filepath)) ||
+            empty($exif['Orientation'])
+        ) {
+            return false;
+        }
+        unset($imginfo);
 
         switch ($exif['Orientation']) {
             case 3:
@@ -1023,12 +1216,6 @@ class GdImage
                 break;
         }
 
-        if ($filepath) {
-            unlink($filepath);
-        }
-        $this->generateImage($img, $filepath);
-        imagedestroy($img);
-
-        return $filepath;
+        return true;
     }
 }

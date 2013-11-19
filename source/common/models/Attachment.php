@@ -1,19 +1,21 @@
 <?php
 abstract class Attachment extends Model
 {
-    public $news_id;
-    public $id;
-    public $name;
-    public $description;
-    public $mime;
-    public $file;
-    public $sort;
+    /*
+    public $rel_id;
+    public ${prefix}id;
+    public ${prefix}note; // title
+    public ${prefix}type; // mime
+    public ${prefix}name; // file
+    public ${prefix}sort;
+     */
 
     protected $_config = array(
         'model' => 'Attachment',
         'primaryKey' => 'id',
         'table' => 'files',
         'uploadDir' => 'uploads/files/',
+        'prefix' => NULL,
 
         'belongsTo' => array(
             'parent' => array(
@@ -27,17 +29,16 @@ abstract class Attachment extends Model
 
     public function fields()
     {
+        $prefix = $this->_config['prefix'];
+
         return array(
-            'name' => array(
-                'label' => __('檔案名稱'), 'required' => false
+            $prefix . 'note' => array(
+                'label' => __('檔案標題'), 'required' => false,
             ),
-            'description' => array(
-                'label' => __('檔案簡述'), 'required' => false,
-            ),
-            'mime' => array(
+            $prefix . 'type' => array( // mime
                 'label' => __('檔案類型'), 'required' => false,
             ),
-            'sort' => array(
+            $prefix . 'sort' => array(
                 'label' => __('排序'), 'required' => false,
                 'callbacks' => array('intval')
             ),
@@ -46,18 +47,22 @@ abstract class Attachment extends Model
 
     public function getFileUrl()
     {
-        return ROOT_URL . $this->_config['uploadDir'] . $this->file;
+        $prefix = $this->_config['prefix'];
+        return ROOT_URL . $this->_config['uploadDir'] . $this->{$prefix.'name'};
     }
 
-    public function getName()
+    public function getTitle()
     {
-        return $this->name ? $this->name : $this->file;
+        $prefix = $this->_config['prefix'];
+        return $this->{$prefix.'note'} ? $this->{$prefix.'note'} : $this->{$prefix.'name'};
     }
 
     public function uploadConfig($key)
     {
+        $prefix = $this->_config['prefix'];
+
         return array(
-            'file' => array(
+            $prefix . 'name' => array(
                 'label' => __('檔案'), 'required' => true,
                 'dir' => ROOT_PATH . $this->_config['uploadDir'],
                 'fileKey' => $key,
@@ -66,19 +71,19 @@ abstract class Attachment extends Model
         );
     }
 
-    public function bunchActions($foreignKey, &$input, $dataKeys)
+    public function bunchActions($foreignKey, &$input, $actions)
     {
         try {
-            foreach ($dataKeys as $action => $key) {
-                if ( empty($input[$key]) || !is_array($input[$key])) {
+            foreach ($actions as $action => $inputKey) {
+                if ( empty($input[$inputKey]) || !is_array($input[$inputKey])) {
                     continue;
                 }
                 $method = 'bunch' . camelize($action, true);
 
                 if ('create' === $action) {
-                    $this->{$method}($foreignKey, $input[$key], $key);
+                    $this->{$method}($foreignKey, $input[$inputKey], $inputKey);
                 } else {
-                    $this->{$method}($input[$key]);
+                    $this->{$method}($input[$inputKey]);
                 }
             }
         } catch ( Exception $ex ) {
@@ -89,20 +94,22 @@ abstract class Attachment extends Model
 
     public function bunchUpdate($input)
     {
-        $updates = array('name', 'description', 'sort');
+        $prefix = $this->_config['prefix'];
+        $updates = array($prefix.'note', $prefix.'sort');
         $model = $this->_config['model'];
+
         $m = new $model;
         foreach ($input as $id => $data) {
-            $m->id = $id;
-            $m->name = $data['name'];
-            $m->description = $data['description'];
-            $m->sort = (int) $data['sort'];
+            $m->{$prefix . 'id'} = $id;
+            $m->{$prefix . 'note'} = $data[$prefix.'note'];
+            $m->{$prefix . 'sort'} = (int) $data[$prefix.'sort'];
             $m->update($updates);
         }
     }
 
     public function bunchCreate($relKey, &$input, $fileKey)
     {
+        $prefix = $this->_config['prefix'];
         $model = $this->_config['model'];
         $this->_new_files = array();
 
@@ -118,15 +125,15 @@ abstract class Attachment extends Model
                     $m->verify( $fileFieldConf, $data);
 
                     $fields[$rconf['relKey']] = true;
-                    $fields['file'] = true;
-                    $fields['mime'] = true;
-                    $m->mime = $m->file_type;
-                    if (!$m->name) {
-                        $info = pathinfo($m->file_orignal_name);
+                    $fields[$prefix.'name'] = true;
+                    $fields[$prefix.'type'] = true;
+                    $m->{$prefix.'type'} = $m->{$prefix.'name_type'};
+                    if (!$m->{$prefix.'note'}) {
+                        $info = pathinfo($m->{$prefix.'name_orignal_name'});
                         if ( !isset($info['filename'])) {
                             $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
                         }
-                        $m->name = $info['filename'];
+                        $m->{$prefix.'note'} = $info['filename'];
                     }
                 }
                 $this->_new_files = array_merge($this->_new_files, $m->_new_files);
@@ -140,11 +147,12 @@ abstract class Attachment extends Model
 
     public function bunchDelete($ids)
     {
+        $prefix = $this->_config['prefix'];
         $ids = array_map('intval', $ids);
         DBHelper::deleteColumnFile(array(
             'table' => $this->_config['table'],
-            'columns' => array('file'),
-            'where' => '`' . $this->_config['primaryKey'] . '` ' . DBHelper::in($ids) . ' AND `file` != \'\'',
+            'columns' => array($prefix.'name'),
+            'where' => '`' . $this->_config['primaryKey'] . '` ' . DBHelper::in($ids) . ' AND `' . $prefix . 'name` != \'\'',
             'dir' => ROOT_PATH . $this->_config['uploadDir'],
         ));
         DBHelper::deleteAll($this->_config['model'], $ids);
@@ -152,12 +160,13 @@ abstract class Attachment extends Model
 
     public function deleteAllByParent($relKeys)
     {
+        $prefix = $this->_config['prefix'];
         $relKeys = DBHelper::in($relKeys);
         $where = '`' . $this->_config['belongsTo']['parent']['relKey'] . '` ' . $relKeys;
         DBHelper::deleteColumnFile(array(
             'table' => $this->_config['table'],
-            'columns' => array('file'),
-            'where' => $where . ' AND `file` != \'\'',
+            'columns' => array($prefix.'name'),
+            'where' => $where . ' AND `' . $prefix . 'name` != \'\'',
             'dir' => ROOT_PATH . $this->_config['uploadDir'],
         ));
         App::db()->exec('DELETE FROM `' . $this->_config['table'] . '` WHERE ' . $where);
@@ -169,25 +178,28 @@ abstract class Attachment extends Model
             return null;
         }
 
+        $prefix = $this->_config['prefix'];
+
         $search = new Search;
         $search->where[] = '`' . $this->_config['belongsTo']['parent']['relKey'] . '` = ?';
         $search->params[] = $relKey;
-        App::loadHelper('Pagination', false, 'common');
-        $pager = new Pagination(array(
-            'sortField' => 'sort',
-            'sortDir' => 'asc',
-            'rowsPerPage' => false
-        ));
+        $search->orderBy = '`' . $prefix . 'sort` ASC';
 
-        return DBHelper::getList($this->_config['model'], $search, $pager);
+        return DBHelper::getList($this->_config['model'], $search, NULL);
     }
 
     public function selectInfo($for)
     {
+        $prefix = $this->_config['prefix'];
+
         $select = array();
         switch ($for) {
             case 'list':
-                $select[] = '`id`, `name`, `description`, `sort`, `mime`, `file`';
+                $select[] = '`' . $prefix . 'id`,'
+                    . ' `' . $prefix . 'note`,'
+                    . ' `' . $prefix . 'type`,'
+                    . ' `' . $prefix . 'name`,'
+                    . ' `' . $prefix . 'sort`';
                 break;
             default:
                 break;
@@ -195,4 +207,9 @@ abstract class Attachment extends Model
 
         return implode(',', $select);
     }
+}
+interface IAttachemntsRead
+{
+    public function getAttachmentClass();
+    public function attachments();
 }

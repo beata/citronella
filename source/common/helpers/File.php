@@ -119,17 +119,7 @@ class File
             ini_set('zlib.output_compression', 'Off');
         }
 
-        header('Pragma: public'); // required
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-        header('Cache-Control: private',false); // required for certain browsers
-        header('Content-type:application/force-download');
-        if ($fancyName === NULL) {
-            header('Content-Disposition: attachment; filename="' . $simpleName . '"');
-        } else {
-            header('Content-Disposition: attachment; filename="' . $simpleName . '"; filename*=utf-8\'\'' . rawurlencode($fancyName));
-        }
-        header('Content-Transfer-Encoding: binary');
+        self::downloadHeader('application/force-download', 'binary', $simpleName, $fancyName);
         header('Content-Length: ' . filesize($filePath));
         readfile($filePath);
     }
@@ -156,4 +146,20 @@ class File
         return round($bytes, 2) . $unit[$step];
     }
 
+    public static function downloadHeader($mime, $transferEncoding, $simpleName, $fancyName=NULL)
+    {
+        header('Pragma: public'); // required
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Cache-Control: private',false); // required for certain browsers
+        header('Content-type: ' . $mime);
+        if ($fancyName === NULL) {
+            header('Content-Disposition: attachment; filename="' . $simpleName . '"');
+        } else {
+            header('Content-Disposition: attachment; filename="' . $simpleName . '"; filename*=utf-8\'\'' . rawurlencode($fancyName));
+        }
+        if ($transferEncoding) {
+            header('Content-Transfer-Encoding: ' . $transferEncoding);
+        }
+    }
 }

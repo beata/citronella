@@ -1,25 +1,36 @@
 <?php
 class Configuration extends Model
 {
+    public $lang;
     public $group;
     public $id;
+    public $title;
     public $value;
     public $input_type;
     public $input_options;
     public $input_class;
     public $input_attrs;
     public $help_text;
+    public $sort;
 
     private $_input;
 
     protected $_config = array(
-        'primaryKey' => 'id',
-        'table' => 'configuration',
+        'primaryKey' => array('lang', 'id'),
+        'table' => 'tb_configuration',
         'uploadDir' => 'uploads/configuration/',
 
         'groups' => array(
             'basic' => array(
                 'key' => 1, 'name' => NULL /* name would be set later in the __construct() */ ),
+            'email' => array(
+                'key' => 2, 'name' => NULL),
+            'service' => array(
+                'key' => 3, 'name' => NULL),
+            'join' => array(
+                'key' => 5, 'name' => NULL),
+            'thirdparty' => array(
+                'key' => 4, 'name' => NULL)
         ),
 
         'inputTypes' => array(
@@ -33,19 +44,15 @@ class Configuration extends Model
             31 => 'textarea',
             32 => 'html',
         ),
-
-        'inputLabels' => NULL, // would be set later in the __construct()
     );
 
     public function __construct()
     {
         $this->_config['groups']['basic']['name'] = __('基本設定');
-        $this->_config['inputLabels'] = array(
-            'site_name' => __('網站名稱'),
-            'system_email' => __('系統信箱'),
-            'service_email' => __('服務信箱'),
-            'footer' => __('頁腳文字'),
-        );
+        $this->_config['groups']['email']['name'] = __('郵件設定');
+        $this->_config['groups']['service']['name'] = __('服務中心頁');
+        $this->_config['groups']['join']['name'] = __('加入聯盟頁');
+        $this->_config['groups']['thirdparty']['name'] = __('第三方服務');
     }
 
     public function fields($for='manage')
@@ -82,7 +89,7 @@ class Configuration extends Model
 
     public function getLabel()
     {
-        return $this->_config['inputLabels'][$this->id];
+        return $this->title;
     }
 
     public function beforeSave(&$fields)
@@ -109,7 +116,7 @@ class Configuration extends Model
     {
         switch ($for) {
             case 'edit':
-                return '`group`, `id`, `value`, `input_type`, `input_options`, `input_class`, `input_attrs`, `help_text`';
+                return '`lang`, `group`, `id`, `title`, `value`, `input_type`, `input_options`, `input_class`, `input_attrs`, `help_text`';
             case 'load':
                 return '`id`, `value`, `input_type`';
             default:
@@ -117,28 +124,40 @@ class Configuration extends Model
         }
     }
 
-    public static function updateAll(PDOStatement $list)
+    public static function updateAll(PDOStatement $list, &$input, $syncLang=FALSE)
     {
         $db = App::db();
 
         $errors = array();
         while ( $item = $list->fetchObject(__CLASS__)) {
-            $input = array();
+            $data = array();
             if ( isset($_POST[$item->id])) {
-                $input['id'] = $item->id;
-                $input['value'] = $_POST[$item->id];
+                $data['id'] = $item->id;
+                $data['value'] = $input[$item->id];
             }
             $fields = $item->fields();
             try {
-                $item->save($fields, true, $input);
+                $item->save($fields, true, $data);
+                $syncLang && $item->__syncLang();
             } catch ( Exception $ex ) {
                 $errors[] = $ex->getMessage();
             }
         }
         if ( !empty($errors)) {
             throw new Exception(implode('<br />', $errors));
-
         }
+    }
+    private function __syncLang()
+    {
+        $db = App::db();
+
+        $encLang = $db->quote($this->lang);
+        $encId = $db->quote($this->id);
+
+        $value = $db->query('SELECT `value` FROM `' . $this->_config['table'] . '` WHERE `lang` = ' . $encLang . ' AND `id` = ' . $encId)->fetchColumn();
+        $sql = 'UPDATE `' . $this->_config['table'] . '` SET `value` = ' . $db->quote($value) . ' WHERE `lang` != ' . $encLang . ' AND `id` = ' . $encId;
+
+        $db->exec($sql);
     }
 
     public static function loadAppConfig($groups)
@@ -151,7 +170,10 @@ class Configuration extends Model
         $appConf = App::conf();
 
         $search = new Search;
+        $search->where[] = '`lang` = ?';
         $search->where[] = '`group` ' . DBHelper::in($groups);
+        $search->params[] = App::conf()->language;
+        $search->orderBy = '`sort` ASC';
 
         $list = DBHelper::getList(__CLASS__, $search, NULL, 'load');
         while ( $item = $list->fetchObject(__CLASS__)) {
@@ -223,7 +245,7 @@ class Configuration_Input_Html extends Configuration_Input
     public function fieldConfig()
     {
         return array(
-            'callbacks' => array('HtmlClean')
+            'callbacks' => array('HtmlClean' => array('admin'))
         );
     }
 }

@@ -14,14 +14,18 @@ if ( phpversion() < 5.3) {
 $config = array(
     'timezone' => 'Asia/Taipei',
     'encoding' => 'UTF-8',
+
     'language' => 'zh',
     'language_code' => 'zh-tw',
     'locale' => 'zh_TW.UTF-8',
+    'enable_i18n' => true,
+
     'enable_rewrite' => false,
     'cache_dir' => 'cache',
     'system_email' => 'noreply@localhost', // 系統的發信地址
     'service_email' => 'service@localhost', // 客服信箱
     'site_name' => 'Site Name',
+    'session_name' => NULL,
 
     // 設定資料庫
     'db' => array(
@@ -45,10 +49,11 @@ $config = array(
     ),
 
     // Google 分析追蹤
-    'ga' => array(
-        'account' => '',    // 追蹤編號
-        'domain' => ''      // 網域(optional)
-    ),
+    'ga_account' => '',     // 追蹤編號
+    'ga_domain' => '',      // 網域(optional)
+
+    // Google Site Search
+    'gs_domain' => '',      // 搜尋網域
 
     // htmlpurifier
     'htmlpurifier' => array(
@@ -76,3 +81,7 @@ if ( ! defined('ASSETS_URL')) {
     define('ASSETS_PATH', ROOT_PATH . 'assets' . DIRECTORY_SEPARATOR);
 }
 define('TRIM_MARKER', '⋯');
+
+if ($config['session_name']) {
+    session_name($config['session_name']);
+}

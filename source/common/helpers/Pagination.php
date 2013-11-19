@@ -184,11 +184,27 @@ class Pagination
         return ' ORDER BY ' . implode(',', $list);
 
     }
-    public function pages($showInfo=false, $cssClass='pagination-centered')
+    public function pages($showInfo=false, $options=array())
     {
+        $options = array_merge(array(
+            'wrapperClass' => 'pagination-centered', // bootstrap 2
+            'paginationClass' => '', // bootstrap 3
+            'bootstrapVersion' => 2
+        ), $options);
+
+        $wrapperClass = $paginationClass = $bootstrapVersion = NULL;
+        extract($options, EXTR_IF_EXISTS);
+
+        if ( 2 == $bootstrapVersion) {
+            $wrapperClass = 'pagination ' . $wrapperClass;
+            $ulClass = '';
+        } else {
+            $wrapperClass = 'pagination-wrapper ' . $wrapperClass;
+            $ulClass = 'pagination ' . $paginationClass;
+        }
         if ($this->totalPages < 2) {
             if ($showInfo) {
-                echo '<div class="pagination ', $cssClass, '"><p class="pagination-info">', $this->info(), '</p></div>';
+                echo '<div class="', $wrapperClass, '"><p class="pagination-info">', $this->info(), '</p></div>';
             }
 
             return;
@@ -202,7 +218,7 @@ class Pagination
         $numStart = max(1, $this->currentPage - $midNumber);
         $numEnd = min($this->totalPages, $numStart + $this->numPerPage);
 
-        echo '<div class="pagination ', $cssClass, '"><ul>';
+        echo '<div class="', $wrapperClass, '"><ul', ($ulClass ? ' class="' . $ulClass . '"' : ''), '>';
 
         $url = $urlparams
             ? '?' . $urlparams . '&amp;' . $this->param . '='

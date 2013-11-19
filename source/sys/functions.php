@@ -14,6 +14,24 @@ function array_get_value(&$array, $firstKey=NULL, $secondKey=NULL)
     }
     return (isset($item[$secondKey]) ? $item[$secondKey] : NULL);
 }
+// Filesystem functions
+function get_file_path($dir, $file, $suffix=NULL)
+{
+    if ( !$file) {
+        return '';
+    }
+
+    if ( NULL === $suffix) {
+        return $dir . $file;
+    }
+
+    $info = pathinfo($file);
+    if ( !isset($info['filename'])) {
+        $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
+    }
+    return $dir . $info['filename'] . $suffix . ($info['extension'] ? '.' . $info['extension'] : '');
+}
+
 // HTTP Functions
 function is_ssl()
 {
@@ -116,7 +134,7 @@ function __createHTMLPurifier($key='default')
         App::loadVendor('ezyang/htmlpurifier/library/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
     }
 
-    $appConf = App::config();
+    $appConf = App::conf();
     $settings = isset($appConf->htmlpurifier->{$key})
         ? (array) $appConf->htmlpurifier->{$key}
         : array();
@@ -147,7 +165,7 @@ function __createHTMLPurifier($key='default')
         ),
 
         'Cache.SerializerPath' => ROOT_PATH . App::conf()->cache_dir . DIRECTORY_SEPARATOR . 'htmlpurifier'
-    ), $settings);
+    ), $settings));
 
     $def = $pConfig->getHTMLDefinition(true);
     $def->addAttribute('table', 'align', 'Enum#left,center,right');
@@ -247,7 +265,7 @@ function fresh_message($showDismiss=true)
 function block_message($message, $type = 'error', $showDismiss=false) {
     echo '<div class="alert alert-', $type,'">';
     if ( $showDismiss ) {
-        echo '<a class="close" data-dismiss="alert" href="#">&times;</a>';
+        echo '<a class="close" data-dismiss="alert" aria-hidden="true" href="#">&times;</a>';
     }
     echo  $message, '</div>';
 }
@@ -307,6 +325,47 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
         }
     }
 }
+/**
+ * 根據傳入的陣列印出 input:checkbox, input:radio 標籤 for Twitter Bootstrap 3
+ *
+ * @param string $type radio or checkbox
+ * @param array $array 要印出標籤的鍵值對
+ * @param string $name input name
+ * @param string $default 預設選取的鍵
+ * @param string $attrs 其他要附加到 input 的 html 屬性
+ * @param integer $breakEvery 多少個項目後斷行
+ * @return void
+ */
+function bs3_html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakEvery=NULL)
+{
+    $inline = ($breakEvery !== 'block');
+    $i = 0;
+
+    $input_attrs = $attrs;
+    foreach ( $array as $value => $label)
+    {
+        if ( is_array($attrs) ) {
+            $input_attrs = isset($attrs[$value]) ? $attrs[$value] : '';
+        }
+        $i++;
+        $value_enc = HtmlValueEncode($value);
+        echo '<label class="',
+            ( $inline ? $type.'-inline ' : ''),
+            ' nowrap margin-right-half"><input type="', $type, '" name="', $name,
+            ($type === 'checkbox' ? '[' . $value_enc . ']' : ''),
+            '" value="', $value_enc, '"',
+            (
+                ( $type === 'checkbox' && isset($default[$value])) ||
+                ( $type === 'radio' && $value == $default )
+                ? ' checked="checked"' : ''
+            ),
+            ' ' . $input_attrs . ' />', HtmlEncode($label), '</label>';
+        if ( $inline && $breakEvery && 0 === ($i%$breakEvery)) {
+            echo '<br />';
+        }
+    }
+}
+
 function html_hidden_inputs($params, $ignores=NULL)
 {
     if ( NULL !== $ignores ) {
@@ -392,43 +451,6 @@ function show_actions($actions, $default=NULL, $class='input-medium')
     echo '</select>';
 }
 
-function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
-{
-    $urls = App::urls();
-
-    if ( ! $linkCurrent ) {
-        $current = array_pop($path);
-        if (is_array($current)) {
-            $current = $current['name'];
-        }
-    }
-
-    echo '<ul class="breadcrumb margin-bottom">';
-    if ( $beforeText) {
-        echo '<li>', HtmlValueEncode($beforeText), '<span class="divider">/</span></li>';
-    }
-    if ( ! empty($path)) {
-        $size = count($path);
-        $count = 0;
-        foreach ( $path as $node => $name) {
-            $params = NULL;
-            if ( is_array($name)) {
-                $params = empty($name['params']) ? NULL : $name['params'];
-                $name = $name['name'];
-            }
-            $count++;
-            echo '<li><a href="' . $urls->urlto($node, $params) . '">' . HtmlValueEncode($name) . '</a>';
-            if ( !$linkCurrent || $count !== $size) {
-                echo ' <span class="divider">/</span>';
-            }
-            echo '</li>';
-        }
-    }
-    if ( ! $linkCurrent ) {
-        echo '<li>' . HtmlValueEncode($current) . '</li>';
-    }
-    echo '</ul>';
-}
 function search_input($searchby, $unsets=array(), $inputClass=array('by' => 'input-medium', 'query' => 'input-medium'))
 {
     $urls = App::urls();
@@ -452,18 +474,18 @@ function search_input($searchby, $unsets=array(), $inputClass=array('by' => 'inp
 } // search_form
 
 // App View Functions
-function google_analytics($gaSettings)
+function google_analytics($account, $domain)
 {
-    if (empty($gaSettings->account)) {
+    if (empty($account)) {
         return;
     }
 ?>
 <script type="text/javascript">
 
   var _gaq = _gaq || [];
-  _gaq.push(['_setAccount', '<?php echo HtmlValueEncode($gaSettings->account) ?>']);
-<?php if (!empty($gaSettings->domain)): ?>
-  _gaq.push(['_setDomainName', '<?php echo HtmlValueEncode($gaSettings->domain) ?>']);
+  _gaq.push(['_setAccount', '<?php echo HtmlValueEncode($account) ?>']);
+<?php if (!empty($domain)): ?>
+  _gaq.push(['_setDomainName', '<?php echo HtmlValueEncode($domain) ?>']);
 <?php endif; ?>
   _gaq.push(['_trackPageview']);
 
@@ -474,4 +496,31 @@ function google_analytics($gaSettings)
   })();
 </script>
 <?php
+}
+function languageList()
+{
+    static $list = NULL;
+
+    if (NULL === $list) {
+        $list = array();
+        foreach ( (array)App::conf()->locales as $langAbbr => $langConf ) {
+            $list[$langAbbr] = $langConf->name;
+        }
+    }
+    return $list;
+}
+function youtube($youtubeUrl)
+{
+    $encYoutubeUrl = HtmlValueEncode($youtubeUrl);
+    return '<div class="js-youtube" data-url="' . $encYoutubeUrl . '">' . $encYoutubeUrl . '</div>';
+}
+function youtubeImage($youtubeUrl)
+{
+    $pattern  = "/\/\/[^.]+.youtube(?:-nocookie)?.com\/.*\?.*\bv=([^&]+)/";
+    if (!preg_match($pattern, $youtubeUrl, $m)) {
+        return ASSETS_URL . 'images/img-placeholder.jpg';
+    }
+
+    $youtubeId = $m[1];
+    return 'http://img.youtube.com/vi/' . $youtubeId . '/mqdefault.jpg';
 }
