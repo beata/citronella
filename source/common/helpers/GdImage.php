@@ -569,7 +569,7 @@ class GdImage
         $oriW   = $imageInfo['width'];
         $oriH   = $imageInfo['height'];
 
-        if ($oriW*$width > $oriH*$height)
+        if ($oriW/$width > $oriH/$height)
             $height = round($oriH*$width/$oriW);
         else
             $width = round($oriW*$height/$oriH);
