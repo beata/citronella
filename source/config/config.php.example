@@ -12,6 +12,21 @@ if ( phpversion() < 5.3) {
 }
 
 $config = array(
+    // Configurations that will be overwritten by values from db {{{
+
+    'site_name' => 'Site Name',
+    'system_email' => 'noreply@localhost', // 系統的發信地址
+    'contact_email' => 'service@localhost', // 客服信箱
+
+    // Google 分析追蹤
+    'ga_account' => '',     // 追蹤編號
+    'ga_domain' => '',      // 網域(optional)
+
+    // Google Site Search
+    'gs_domain' => '',      // 搜尋網域
+
+    // }}}
+
     'timezone' => 'Asia/Taipei',
     'encoding' => 'UTF-8',
 
@@ -22,9 +37,6 @@ $config = array(
 
     'enable_rewrite' => false,
     'cache_dir' => 'cache',
-    'system_email' => 'noreply@localhost', // 系統的發信地址
-    'service_email' => 'service@localhost', // 客服信箱
-    'site_name' => 'Site Name',
     'session_name' => NULL,
 
     // 設定資料庫
@@ -47,13 +59,6 @@ $config = array(
             'last' => '<i class="icon-fast-forward"></i>',
         )
     ),
-
-    // Google 分析追蹤
-    'ga_account' => '',     // 追蹤編號
-    'ga_domain' => '',      // 網域(optional)
-
-    // Google Site Search
-    'gs_domain' => '',      // 搜尋網域
 
     // htmlpurifier
     'htmlpurifier' => array(

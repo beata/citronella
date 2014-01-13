@@ -93,6 +93,13 @@ class App
     private static $__i18n;
 
 
+    /**
+     * Stores values that was stored via App::store()
+     *
+     * @var mix
+     */
+    private static $__data;
+
 
     /**
      * Convers array to object.
@@ -371,6 +378,25 @@ class App
 
 
     /**
+     * Load Controller
+     *
+     * Path: `{ROOT_PATH}{$appId}/controllers/{$controller}.php`
+     *
+     * @param string $controller The name of the controller to be loaded.
+     * @param boolean $createObj Whether or not to return the controller instance.
+     * @param string $appId Load controller under `$appId` directory. If not set, current `App::$id` would be used.
+     * @return void|Controller
+     */
+    public static function loadController($controller, $createObj=false, $appId=NULL)
+    {
+        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/controllers/' . $controller. '.php';
+
+        if ($createObj) {
+            return new $controller;
+        }
+    }
+
+    /**
      * Load Model
      *
      * Path: `{ROOT_PATH}{$appId}/models/{$model}.php`
@@ -445,6 +471,14 @@ class App
         }
     }
 
+
+    public static function data($key, $value=NULL)
+    {
+        if (func_num_args() > 1) {
+            return (self::$__data[$key] = $value);
+        }
+        return (isset(self::$__data[$key]) ? self::$__data[$key] : NULL);
+    }
 } // END class
 
 /**
@@ -790,6 +824,8 @@ abstract class Model
 
     protected $_autoLastInsertId = TRUE;
 
+    private $__transaciton = FALSE;
+
     /**
      * Model Configuration
      *
@@ -838,6 +874,11 @@ abstract class Model
         Validator::verify($fields, $this, $input);
     }
 
+    public function transaction($active=true)
+    {
+        $this->__transaciton = $active;
+    }
+
     /**
      * Save input by fields settings.
      *
@@ -849,22 +890,42 @@ abstract class Model
      * 6. `afterSave()`
      *
      * @param &array $fields The fields settings. {@see Validator::verify()}
+     * @param &array $input The input data.
      * @param boolean $verify Whether or not to verify the input data.
-     * @param &array $input The input data. If not set, `$_POST` array would be used as $input
      * @param mixed $args Any value that would be used in the process.
      * @return void
      * @see Validator::verify() Validator::verify()
      */
-    public function save(&$fields, $verify=true, &$input=NULL, $args=NULL)
+    public function save(&$fields, &$input, $verify=TRUE, $args=NULL)
     {
-        if (NULL === $input) {
-            $input = &$_POST;
-        }
-
         if ($verify) {
             $this->verify($fields, $input, $args);
         }
+        if ($this->__transaciton) {
+            $this->_transactionSave($fields, $input, $verify, $args);
+        } else {
+            $this->_save($fields, $input, $verify, $args);
+        }
+    }
+    /**
+     * save with transaction
+     */
+    protected function _transactionSave(&$fields, &$input, $verify=TRUE, $args=NULL)
+    {
+        $db = App::db();
 
+        $db->beginTransaction();
+        try {
+            $this->_save($fields, $input, FALSE, $args);
+            $db->commit();
+        } catch ( Exception $ex ) {
+            $db->rollback();
+            throw $ex;
+        }
+    }
+
+    protected function _save(&$fields, &$input, $verify=TRUE, $args=NULL)
+    {
         if ( method_exists($this, 'beforeSave')) {
             $this->beforeSave($fields, $input, $args);
         }
@@ -886,6 +947,7 @@ abstract class Model
             $this->afterSave($fields, $input, $args);
         }
     }
+
 
     public function setForceInsert($forceInsert=TRUE)
     {
@@ -995,6 +1057,21 @@ abstract class Model
         }
 
         return true;
+    }
+
+    protected function _clearFileColumn($column, $suffixes=NULL)
+    {
+        if (!$this->{$column}) {
+            return;
+        }
+
+        DBHelper::deleteFile(array(
+            'data' => $this,
+            'column' => $column,
+            'dir' => ROOT_PATH . $this->_config['uploadDir'],
+            'suffixes' => $suffixes
+        ));
+        $this->{$column} = '';
     }
 
     // Model Config
@@ -1217,6 +1294,16 @@ class View
         return ROOT_PATH . ($appId ? $appId : $this->__appId) . '/views/';
     }
 
+    public function hasView($viewFile, $appId=NULL, $viewData=array())
+    {
+        if ( false === strpos($viewFile, '.')) {
+            $file = $this->__getDir($appId) . $viewFile . '.html';
+       } else {
+            $file = $this->__getDir($appId) . $viewFile;
+        }
+        return file_exists($file);
+    }
+
     /**
      * Returns contents of specific view file
      *
@@ -1245,7 +1332,7 @@ class View
         extract($viewData);
         if ( false === strpos($viewFile, '.')) {
             include $this->__getDir($appId) . $viewFile . '.html';
-        } else {
+       } else {
             include $this->__getDir($appId) . $viewFile;
         }
     }
@@ -1286,10 +1373,10 @@ class View
         $this->data = $data;
 
         if ( file_exists($this->__getDir($layoutAppId) . 'functions.php')) {
-            include $this->__getDir($layoutAppId) . 'functions.php';
+            include_once $this->__getDir($layoutAppId) . 'functions.php';
         }
         if ( file_exists($this->__getDir($layoutAppId) . $layout . '_functions.php')) {
-            include $this->__getDir($layoutAppId) . $layout . '_functions.php';
+            include_once  $this->__getDir($layoutAppId) . $layout . '_functions.php';
         }
 
         ob_start();
@@ -2110,6 +2197,19 @@ class DBHelper
         return array_combine($array, $array);
     }
 
+    public static function asTree(&$map, $parentKey='parent_id')
+    {
+        $tree = array();
+        foreach ($map as $item) {
+            if (!$item->{$parentKey}) {
+                $tree[] = $item;
+                continue;
+            }
+            $map[$item->{$parentKey}]->items[$item->id] = $item;
+        }
+        return $tree;
+    }
+
 } // END class
 
 
@@ -2271,7 +2371,7 @@ class Validator
 
                 if (! $is_empty) {
 
-                    if ('date' === $opt['type'] || 'datetime' === $opt['type']) {
+                    if ('date' === $opt['type'] || 'datetime' === $opt['type'] || 'time' === $opt['type']) {
                         self::__verifyDateTime($data, $key, $opt);
                     }
                     if ( isset($opt['pattern']) ) {
@@ -2325,10 +2425,19 @@ class Validator
                     _e('%s: 非正確的時間格式'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
         }
-        if ('date' === $opt['type']) {
-            $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
-        } else {
-            $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d H:i:s';
+        switch ($opt['type']) {
+            case 'date':
+            default:
+                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d';
+                break;
+
+            case 'time':
+                $format = isset($opt['format']) ? $opt['format'] : 'H:i:s';
+                break;
+
+            case 'datetime':
+                $format = isset($opt['format']) ? $opt['format'] : 'Y-m-d H:i:s';
+                break;
         }
         $data->{$key} = date($format, $timestamp);
     }
@@ -2481,6 +2590,8 @@ class Validator
             (isset($opt['cropOrigin']) ? $opt['cropOrigin'] : NULL)
         );
         $data->{$key} = $input[$key] = $source;
+        $data->{$key.'_orignal_name'} = $gd->getUploadName($fileKey, $fileKeyIdx);
+        $data->{$key.'_type'} = $input[$key.'_type'] = $gd->getUploadMIMEType($fileKey, $fileKeyIdx);
 
         if ( isset($opt['thumbnails'])) {
             foreach ($opt['thumbnails'] as $suffix => $sOpt) {
@@ -3247,7 +3358,7 @@ class Urls
         } else {
             $params = array( $this->_paramName => $url );
             if ( !empty($urlParams)) {
-                $params = array_merge($urlParams, $params);
+                $params = array_merge($params, $urlParams); // 路徑參數在前
             }
             $url = http_build_query($params, '', $argSeparator);
             if ($url) {

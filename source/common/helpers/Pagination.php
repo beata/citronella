@@ -67,8 +67,8 @@ class Pagination
 
     public function __construct($config=array())
     {
-        $this->symbalAsc = ' <i class="icon-chevron-up" title="' .  _e('小至大') .  '"></i>';
-        $this->symbalDesc = ' <i class="icon-chevron-down" title="' .  _e('大至小') .  '"></i>';
+        $this->symbalAsc = ' <i class="glyphicon glyphicon-chevron-up" title="' .  _e('小至大') .  '"></i>';
+        $this->symbalDesc = ' <i class="glyphicon glyphicon-chevron-down" title="' .  _e('大至小') .  '"></i>';
         $this->infoFormat = _e('有 %s 筆資料，總共 %s 頁');
 
         if ( ! array_key_exists('rowsPerPage', $config)) {
@@ -157,6 +157,11 @@ class Pagination
     }
     public function getSqlOrderBy()
     {
+        // specify order by directly from search object
+        if (!empty($this->searchOrderBy)) {
+            return ' ORDER BY ' . $this->searchOrderBy;
+        }
+
         $list = array();
 
         if ( !empty($this->primarySortField)) {
@@ -187,19 +192,19 @@ class Pagination
     public function pages($showInfo=false, $options=array())
     {
         $options = array_merge(array(
-            'wrapperClass' => 'pagination-centered', // bootstrap 2
+            'wrapperClass' => '',
             'paginationClass' => '', // bootstrap 3
-            'bootstrapVersion' => 2
+            'bootstrapVersion' => 3
         ), $options);
 
         $wrapperClass = $paginationClass = $bootstrapVersion = NULL;
         extract($options, EXTR_IF_EXISTS);
 
         if ( 2 == $bootstrapVersion) {
-            $wrapperClass = 'pagination ' . $wrapperClass;
+            $wrapperClass = 'pagination ' . ($wrapperClass ? $wrapperClass : 'pagination-centered');
             $ulClass = '';
         } else {
-            $wrapperClass = 'pagination-wrapper ' . $wrapperClass;
+            $wrapperClass = 'pagination-wrapper ' . ($wrapperClass ? $wrapperClass : 'text-center');
             $ulClass = 'pagination ' . $paginationClass;
         }
         if ($this->totalPages < 2) {

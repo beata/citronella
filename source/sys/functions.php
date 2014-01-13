@@ -32,6 +32,45 @@ function get_file_path($dir, $file, $suffix=NULL)
     return $dir . $info['filename'] . $suffix . ($info['extension'] ? '.' . $info['extension'] : '');
 }
 
+/**
+ * 給人類讀的檔案大小
+ *
+ * @param integer file size in bytes
+ * @return string
+ */
+function formatBytes($bytes)
+{
+    if ( ! is_numeric($bytes) ) {
+        return 'NaN';
+    }
+
+    $decr = 1024;
+    $step = 0;
+    $unit = array('Byte','KB','MB','GB','TB','PB');
+    while (($bytes / $decr) > 0.9) {
+        $bytes = $bytes / $decr;
+        $step++;
+    }
+
+    return round($bytes, 2) . $unit[$step];
+}
+function returnBytes($val)
+{
+    $val = trim($val);
+    $last = strtoupper($val[strlen($val)-1]);
+    switch($last) {
+        // The 'G' modifier is available since PHP 5.1.0
+        case 'G':
+            $val *= 1024;
+        case 'M':
+            $val *= 1024;
+        case 'K':
+            $val *= 1024;
+    }
+
+    return $val;
+}
+
 // HTTP Functions
 function is_ssl()
 {
@@ -137,7 +176,7 @@ function __createHTMLPurifier($key='default')
     $appConf = App::conf();
     $settings = isset($appConf->htmlpurifier->{$key})
         ? (array) $appConf->htmlpurifier->{$key}
-        : array();
+        : (array) $appConf->htmlpurifier->default;
 
 
     $pConfig = HTMLPurifier_Config::createDefault();
@@ -217,6 +256,18 @@ function camelize($str, $upper_first = true)
     }
     return $str;
 }
+function input_required($field)
+{
+    if ( $field['required']) {
+        return ' required="required"';
+    }
+    return '';
+}
+function currencyTW($number, $sign='NT$')
+{
+    return $sign . number_format($number);
+}
+// Datetime
 function shorten_date($date, $callback=NULL, $date_format='Y/m/d', $time_format='H:i:s')
 {
     if ( ! $date) {
@@ -232,17 +283,41 @@ function shorten_date($date, $callback=NULL, $date_format='Y/m/d', $time_format=
     }
     return $date;
 }
-function input_required($field)
+
+/**
+ * split datetime string into associative array.
+ *
+ * @param string $time datetime string
+ * @return array
+ */
+function datetime_info($time)
 {
-    if ( $field['required']) {
-        return ' required="required"';
+    if ( ! $time = strtotime($time)) {
+        return array( 'date' => NULL, 'time' => NULL);
     }
-    return '';
+    return array(
+        'date' => date('Y/m/d', $time),
+        'time' => date('H:i:s', $time)
+    );
 }
-function currencyTW($number, $sign='NT$')
+/**
+ * concat datetime array into sql datetime format.
+ *
+ * @param array $time
+ * @return string
+ */
+function sql_datetime($time)
 {
-    return $sign . number_format($number);
+    if ( ! is_array($time)) {
+        return $time;
+    }
+    if ( ! isset($time['date'])) {
+        return '';
+    }
+    $time = trim($time['date'] . ' ' . (isset($time['time']) ? $time['time'] : ''));
+    return $time;
 }
+
 // System View Functions
 /**
  * 顯示 session 訊息
@@ -262,7 +337,7 @@ function fresh_message($showDismiss=true)
  *
  * @return void
  **/
-function block_message($message, $type = 'error', $showDismiss=false) {
+function block_message($message, $type = 'danger', $showDismiss=false) {
     echo '<div class="alert alert-', $type,'">';
     if ( $showDismiss ) {
         echo '<a class="close" data-dismiss="alert" aria-hidden="true" href="#">&times;</a>';
@@ -325,6 +400,39 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
         }
     }
 }
+function nested_html_checkboxes($type, $array, $name, $default=NULL, $attrs='')
+{
+    $i = 0;
+
+    $input_attrs = $attrs;
+    echo '<ul class="list-unstyled margin-left">';
+    foreach ( $array as $item)
+    {
+        $value = $item->id;
+        $label = $item->name;
+
+        if ( is_array($attrs) ) {
+            $input_attrs = isset($attrs[$value]) ? $attrs[$value] : '';
+        }
+        $i++;
+        $value_enc = HtmlValueEncode($value);
+        echo '<li><label class="nowrap margin-right-half"><input type="', $type, '" name="', $name,
+            ($type === 'checkbox' ? '[' . $value_enc . ']' : ''),
+            '" value="', $value_enc, '"',
+            (
+                ( $type === 'checkbox' && isset($default[$value])) ||
+                ( $type === 'radio' && $value == $default )
+                ? ' checked="checked"' : ''
+            ),
+            ' ' . $input_attrs . ' /> ', HtmlEncode($label), '</label>';
+        if (!empty($item->items)) {
+            nested_html_checkboxes($type, $item->items, $name, $default, $attrs);
+        }
+        echo '</li>';
+    }
+    echo '</ul>';
+}
+
 /**
  * 根據傳入的陣列印出 input:checkbox, input:radio 標籤 for Twitter Bootstrap 3
  *
@@ -435,7 +543,7 @@ function show_actions($actions, $default=NULL, $class='input-medium')
         return;
     }
 
-    echo _e('選擇的項目'), ': <select class="' . $class . '" name="action" id="selActions">';
+    echo '<label class="control-label padding-right">', _e('選擇的項目'), ': </label><select class="form-control auto-width ' . $class . '" name="action" id="selActions">';
     foreach ( $actions as $action => $info) {
         echo '<option value="'.$action.'"';
         if ( $action === $default) {
@@ -451,21 +559,24 @@ function show_actions($actions, $default=NULL, $class='input-medium')
     echo '</select>';
 }
 
-function search_input($searchby, $unsets=array(), $inputClass=array('by' => 'input-medium', 'query' => 'input-medium'))
+function search_input($search, $unsets=array(), $inputClass=array('by' => 'input-medium', 'query' => 'input-medium'))
 {
     $urls = App::urls();
 ?>
-  <?php if (count($searchby) > 1): ?>
-  <select class="<?php echo $inputClass['by'] ?>" name="by">
-  <option value=""><?php echo _e('搜尋欄位') ?></option>
-    <?php html_options($searchby, (isset($_GET['by']) ? $_GET['by'] : null)); ?>
-  </select>
+  <?php if (count($search->byList) > 1): ?>
+  <div class="col-xs-3">
+      <select class="form-control <?php echo $inputClass['by'] ?>" name="by">
+      <option value=""><?php echo _e('搜尋欄位') ?></option>
+        <?php html_options($search->byList, $search->by); ?>
+      </select>
+  </div>
   <?php else: ?>
-  <input name="by" type="hidden" value="<?php echo current(array_keys($searchby)) ?>" />
+  <input name="by" type="hidden" value="<?php echo current(array_keys($search->byList)) ?>" />
   <?php endif; ?>
 
-  <div class="input-append">
-      <input class="search-query <?php echo $inputClass['query'] ?>" type="search" name="keyword" placeholder="<?php echo (count($searchby) > 1 ? 'Search...' : HtmlValueEncode(current($searchby))) ?>" value="<?php if ( isset($_GET['keyword'])): echo HtmlValueEncode($_GET['keyword']); endif; ?>" /><button type="submit" class="btn btn-success"><?php echo _e('搜尋') ?></button>
+  <div class="input-group col-xs-4 no-padding">
+      <input class="form-control <?php echo $inputClass['query'] ?>" type="search" name="keyword" placeholder="<?php echo (count($search->byList) > 1 ? 'Search...' : HtmlValueEncode(current($search->byList))) ?>" value="<?php echo HtmlValueEncode($search->keyword) ?>" />
+      <span class="input-group-btn"><button type="submit" class="btn btn-primary"><?php echo _e('搜尋') ?></button></span>
   </div>
 <?php
   $unsets[] = 'by';
@@ -497,30 +608,61 @@ function google_analytics($account, $domain)
 </script>
 <?php
 }
-function languageList()
+function ui_tabs($list, $current, $options=array())
 {
-    static $list = NULL;
+    $options = array_merge(array(
+        'urlPrefix' => '',
+        'urlSuffix' => '',
+        'urlParams' => NULL,
+        'appendLi' => '',
+        'nameKey' => NULL,
+        'tabStyle' => 'nav nav-tabs'
+    ), $options);
 
-    if (NULL === $list) {
-        $list = array();
-        foreach ( (array)App::conf()->locales as $langAbbr => $langConf ) {
-            $list[$langAbbr] = $langConf->name;
+    $urls = App::urls();
+
+    echo '<ul class="', $options['tabStyle'],' clearfix">';
+    foreach ( $list as $key => $name ) {
+      if (is_array($name) && NULL !== $options['nameKey']) {
+        $name = $name[$options['nameKey']];
+      }
+      echo '<li'
+        . ( $key == $current ? ' class="active"' : '')
+        . '><a href="' . $urls->urlto($options['urlPrefix'] . $key . $options['urlSuffix'], $options['urlParams']) .'">' . HtmlValueEncode($name) . '</a></li>';
+    }
+    echo $options['appendLi'], '</ul>';
+}
+
+function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
+{
+    $urls = App::urls();
+
+    if ( ! $linkCurrent ) {
+        $current = array_pop($path);
+        if (is_array($current)) {
+            $current = $current['name'];
         }
     }
-    return $list;
-}
-function youtube($youtubeUrl)
-{
-    $encYoutubeUrl = HtmlValueEncode($youtubeUrl);
-    return '<div class="js-youtube" data-url="' . $encYoutubeUrl . '">' . $encYoutubeUrl . '</div>';
-}
-function youtubeImage($youtubeUrl)
-{
-    $pattern  = "/\/\/[^.]+.youtube(?:-nocookie)?.com\/.*\?.*\bv=([^&]+)/";
-    if (!preg_match($pattern, $youtubeUrl, $m)) {
-        return ASSETS_URL . 'images/img-placeholder.jpg';
-    }
 
-    $youtubeId = $m[1];
-    return 'http://img.youtube.com/vi/' . $youtubeId . '/mqdefault.jpg';
+    echo '<ul class="breadcrumb no-margin-bottom">';
+    if ( $beforeText) {
+        echo '<li>', HtmlValueEncode($beforeText), '</li>';
+    }
+    if ( ! empty($path)) {
+        $size = count($path);
+        $count = 0;
+        foreach ( $path as $node => $name) {
+            $params = NULL;
+            if ( is_array($name)) {
+                $params = empty($name['params']) ? NULL : $name['params'];
+                $name = $name['name'];
+            }
+            $count++;
+            echo '<li><a href="' . $urls->urlto($node, $params) . '">' . HtmlValueEncode($name) . '</a></li>';
+        }
+    }
+    if ( ! $linkCurrent ) {
+        echo '<li>' . HtmlValueEncode($current) . '</li>';
+    }
+    echo '</ul>';
 }

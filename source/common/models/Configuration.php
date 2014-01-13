@@ -1,23 +1,14 @@
 <?php
-class Configuration extends Model
-{
-    public $lang;
-    public $group;
-    public $id;
-    public $title;
-    public $value;
-    public $input_type;
-    public $input_options;
-    public $input_class;
-    public $input_attrs;
-    public $help_text;
-    public $sort;
+App::loadModel('behaviors/FormInput', FALSE, 'common');
 
-    private $_input;
+class Configuration extends FormInputModel
+{
+    // public $lang;
+    public $group;
 
     protected $_config = array(
-        'primaryKey' => array('lang', 'id'),
-        'table' => 'tb_configuration',
+        'primaryKey' => 'key',
+        'table' => 'configuration',
         'uploadDir' => 'uploads/configuration/',
 
         'groups' => array(
@@ -25,100 +16,37 @@ class Configuration extends Model
                 'key' => 1, 'name' => NULL /* name would be set later in the __construct() */ ),
             'email' => array(
                 'key' => 2, 'name' => NULL),
-            'service' => array(
-                'key' => 3, 'name' => NULL),
-            'join' => array(
-                'key' => 5, 'name' => NULL),
             'thirdparty' => array(
-                'key' => 4, 'name' => NULL)
-        ),
-
-        'inputTypes' => array(
-            0  => 'none',
-            11 => 'text',
-            12 => 'email',
-            13 => 'url',
-            21 => 'select',
-            22 => 'radio',
-            23 => 'checkbox',
-            31 => 'textarea',
-            32 => 'html',
-        ),
+                'key' => 3, 'name' => NULL)
+        )
     );
 
     public function __construct()
     {
+        parent::__construct();
+
         $this->_config['groups']['basic']['name'] = __('基本設定');
         $this->_config['groups']['email']['name'] = __('郵件設定');
-        $this->_config['groups']['service']['name'] = __('服務中心頁');
-        $this->_config['groups']['join']['name'] = __('加入聯盟頁');
         $this->_config['groups']['thirdparty']['name'] = __('第三方服務');
     }
 
-    public function fields($for='manage')
-    {
-        $attrs = $this->decodeInputAttrs();
-
-        $fields = array(
-            'value' => array_merge(array(
-                'label' => $this->getLabel(),
-                'required' => !empty($attrs['required']),
-            ), $this->input()->fieldConfig()),
-        );
-
-        return $fields;
-    }
-
-    public function decodeInputAttrs()
-    {
-        if (empty($this->input_attrs_array)) {
-            $this->input_attrs_array = empty($this->input_attrs) ? array() : json_decode($this->input_attrs, true);
-        }
-
-        return $this->input_attrs_array;
-    }
-
-    public function decodeInputOptions()
-    {
-        if (empty($this->input_options_array)) {
-            $this->input_options_array = empty($this->input_options) ? array() : json_decode($this->input_options, true);
-        }
-
-        return $this->input_options_array;
-    }
-
-    public function getLabel()
-    {
-        return $this->title;
-    }
-
-    public function beforeSave(&$fields)
+    protected function beforeSave(&$fields)
     {
         $this->input()->beforeSave($fields['value']);
     }
 
-    public function afterSave(&$fields)
+    protected function afterSave(&$fields)
     {
         $this->input()->afterSave($fields['value']);
-    }
-
-    public function input()
-    {
-        if (NULL === $this->_input) {
-            $class = 'Configuration_Input_' . camelize($this->_config['inputTypes'][$this->input_type], true);
-            $this->_input = new $class($this);
-        }
-
-        return $this->_input;
     }
 
     public function selectInfo($for='edit')
     {
         switch ($for) {
             case 'edit':
-                return '`lang`, `group`, `id`, `title`, `value`, `input_type`, `input_options`, `input_class`, `input_attrs`, `help_text`';
+                return '`group`, `key`, `title`, `value`, `input_type`, `input_options`, `input_size`, `input_attrs`, `help_text`';
             case 'load':
-                return '`id`, `value`, `input_type`';
+                return '`key`, `value`, `input_type`';
             default:
                 return '';
         }
@@ -131,14 +59,14 @@ class Configuration extends Model
         $errors = array();
         while ( $item = $list->fetchObject(__CLASS__)) {
             $data = array();
-            if ( isset($_POST[$item->id])) {
-                $data['id'] = $item->id;
-                $data['value'] = $input[$item->id];
+            if ( isset($_POST[$item->key])) {
+                $data['key'] = $item->key;
+                $data['value'] = $input[$item->key];
             }
             $fields = $item->fields();
             try {
-                $item->save($fields, true, $data);
-                $syncLang && $item->__syncLang();
+                $item->save($fields, $data, TRUE);
+                $syncLang && App::conf()->enable_i18n && $item->__syncLang();
             } catch ( Exception $ex ) {
                 $errors[] = $ex->getMessage();
             }
@@ -152,10 +80,10 @@ class Configuration extends Model
         $db = App::db();
 
         $encLang = $db->quote($this->lang);
-        $encId = $db->quote($this->id);
+        $encId = $db->quote($this->key);
 
-        $value = $db->query('SELECT `value` FROM `' . $this->_config['table'] . '` WHERE `lang` = ' . $encLang . ' AND `id` = ' . $encId)->fetchColumn();
-        $sql = 'UPDATE `' . $this->_config['table'] . '` SET `value` = ' . $db->quote($value) . ' WHERE `lang` != ' . $encLang . ' AND `id` = ' . $encId;
+        $value = $db->query('SELECT `value` FROM `' . $this->_config['table'] . '` WHERE `lang` = ' . $encLang . ' AND `key` = ' . $encId)->fetchColumn();
+        $sql = 'UPDATE `' . $this->_config['table'] . '` SET `value` = ' . $db->quote($value) . ' WHERE `lang` != ' . $encLang . ' AND `key` = ' . $encId;
 
         $db->exec($sql);
     }
@@ -163,16 +91,15 @@ class Configuration extends Model
     public static function loadAppConfig($groups)
     {
         $groups = (array) $groups;
-
-        $fake = new self;
-        $types = $fake->getConfig('inputTypes');
-        unset($fake);
+        $types = DBHelper::modelConfig(__CLASS__, 'inputTypes');
         $appConf = App::conf();
 
         $search = new Search;
-        $search->where[] = '`lang` = ?';
+        if (App::conf()->enable_i18n) {
+            $search->where[] = '`lang` = ?';
+            $search->params[] = App::conf()->language;
+        }
         $search->where[] = '`group` ' . DBHelper::in($groups);
-        $search->params[] = App::conf()->language;
         $search->orderBy = '`sort` ASC';
 
         $list = DBHelper::getList(__CLASS__, $search, NULL, 'load');
@@ -180,72 +107,7 @@ class Configuration extends Model
             if ('checkbox' === $types[$item->input_type]) {
                 $item->value = DBHelper::splitCommaList($item->value);
             }
-            $appConf->{$item->id} = $item->value;
+            $appConf->{$item->key} = $item->value;
         }
-    }
-}
-
-abstract class Configuration_Input
-{
-    protected $m;
-
-    public function __construct(Configuration $model)
-    {
-        $this->m = $model;
-    }
-    public function fieldConfig() { return array(); }
-    public function beforeSave(&$field) {}
-    public function afterSave(&$field) {}
-}
-
-class Configuration_Input_None extends Configuration_Input {}
-class Configuration_Input_Text extends Configuration_Input {}
-class Configuration_Input_Email extends Configuration_Input {}
-class Configuration_Input_Url extends Configuration_Input {}
-class Configuration_Input_Select extends Configuration_Input
-{
-    public function fieldConfig()
-    {
-        return array(
-            'list' => $this->m->decodeInputOptions()
-        );
-    }
-}
-
-class Configuration_Input_Radio extends Configuration_Input
-{
-    public function fieldConfig()
-    {
-        return array(
-            'list' => $this->m->decodeInputOptions()
-        );
-    }
-}
-
-class Configuration_Input_Checkbox extends Configuration_Input
-{
-    public function fieldConfig()
-    {
-        return array(
-            'list' => $this->m->decodeInputOptions(),
-            'multiple' => true
-        );
-    }
-
-    public function beforeSave(&$field)
-    {
-        $this->m->value = implode(',', $this->m->value);
-    }
-
-}
-
-class Configuration_Input_Textarea extends Configuration_Input {}
-class Configuration_Input_Html extends Configuration_Input
-{
-    public function fieldConfig()
-    {
-        return array(
-            'callbacks' => array('HtmlClean' => array('admin'))
-        );
     }
 }

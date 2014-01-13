@@ -1023,7 +1023,58 @@ class GdImage
         return $result;
     }
 
+    public function getUploadName($fileKey, $fileKeyIdx=FALSE)
+    {
+        $tmpNameData = $_FILES[$fileKey]['name'];
 
+        if (!is_array($tmpNameData))  {
+            return $tmpNameData;
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($tmpNameData[$fileKeyIdx])) {
+                return NULL;
+            }
+            $tmpNameData = $tmpNameData[$fileKeyIdx];
+            return $tmpNameData;
+        }
+
+        $result = array();
+        foreach ($tmpNameData as $idx => $tmpName) {
+            $result[$idx] = $tmpName;
+        }
+        return $result;
+    }
+
+    /**
+     * Get the uploaded images' mime type
+     *
+     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
+     * @param  integer $fileKeyIdx
+     * @return string|array The image format type of the uploaded image.
+     */
+    public function getUploadMIMEType($fileKey, $fileKeyIdx=FALSE)
+    {
+        $typeData = $_FILES[$fileKey]['type'];
+
+        if (!is_array($typeData))  {
+            return $typeData;
+        }
+
+        if (FALSE !== $fileKeyIdx) {
+            if (!isset($typeData[$fileKeyIdx])) {
+                return NULL;
+            }
+            $typeData = $typeData[$fileKeyIdx];
+            return $typeData;
+        }
+
+        $result = array();
+        foreach ($typeData as $idx => $type) {
+            $result[$idx] = $type;
+        }
+        return $result;
+    }
 
     public function hasSubmitImage($fileKey, $fileKeyIdx=FALSE)
     {
