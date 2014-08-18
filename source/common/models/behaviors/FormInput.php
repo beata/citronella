@@ -12,7 +12,8 @@ abstract class FormInputModel extends Model
     public $sort;
 
     /**
-     * @var FormInput Stores FormInput instance
+     * Stores FormInput instance
+     * @var FormInput
      */
     private $_input;
 
@@ -24,6 +25,7 @@ abstract class FormInputModel extends Model
             12 => 'email',
             13 => 'url',
             14 => 'tel',
+            15 => 'password',
             21 => 'select',
             22 => 'radio',
             23 => 'checkbox',
@@ -103,6 +105,7 @@ class FormInput_Text extends FormInput {}
 class FormInput_Email extends FormInput {}
 class FormInput_Url extends FormInput {}
 class FormInput_Tel extends FormInput {}
+class FormInput_Password extends FormInput {}
 class FormInput_Select extends FormInput
 {
     public function fieldConfig()

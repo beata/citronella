@@ -69,6 +69,7 @@ $config = array(
         ),
         'admin' => array(
             'HTML.SafeIframe' => true,
+            'CSS.AllowTricky' => true,
             // can include any page
             'URI.SafeIframeRegexp' => '%^(http(s)?:)?//%',
         )

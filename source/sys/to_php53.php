@@ -1,9 +1,9 @@
 <?php
 /**
- * Add missing methods which upgradephp doesn't have.
+ * PHP 5.3 back compatibility
  *
- * @author Beata Lin
- * @package Core
+ * @license MIT
+ * @file
  */
 
 if (!function_exists('get_called_class')) {

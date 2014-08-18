@@ -13,12 +13,8 @@ class Sys_Core_SearchTest extends PHPUnit_Framework_TestCase
 
        $this->assertObjectHasAttribute('where', $search);
        $this->assertObjectHasAttribute('params', $search);
-
-       $this->assertObjectHasAttribute('where', $search);
-       $this->assertObjectHasAttribute('params', $search);
        $this->assertTrue(is_array($search->where));
        $this->assertTrue(is_array($search->params));
-
    }
 
    public function testSqlWhere()
@@ -31,6 +27,5 @@ class Sys_Core_SearchTest extends PHPUnit_Framework_TestCase
        $search->where[':b'] = '`col2` = ?';
 
        $this->assertEquals(' WHERE `col1` = ? AND `col2` = ?', $search->sqlWhere());
-
    }
 }

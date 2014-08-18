@@ -1,23 +1,49 @@
 <?php
+/**
+ * File class file
+ *
+ * @package Helper.Menu
+ * @license MIT
+ * @file
+ */
+
+/**
+ * IMenuListable
+ */
 interface IMenuListable
 {
+    /**
+     * Should return a list of MenuItems
+     *
+     * @param string $pathPrefix The path to be prepended to each returning MenuItems.
+     * @return MenuItem[]
+     */
     public static function fetchMenuItems($pathPrefix);
 }
 
+/**
+ * Menu class
+ */
 abstract class Menu
 {
     /**
      * Stores menu items.
-     *
      * @var MenuItem[]
      */
-    protected $_items;
+    protected $_items = array();
 
     /**
-     * assign MenuItem to $_items;
+     * This method assigns MenuItem to `$this->_items`;
      */
-    abstract protected function load();
+    abstract protected function load($role=NULL);
 
+    /**
+     * Get MenuItem property by 'path'
+     *
+     * @param string $path The MenuItem 'path' property.
+     * @param string $dataKey The property name.
+     * @return string|null
+     */
     public function get($path, $dataKey=NULL)
     {
         foreach ( $this->_items as $item) {
@@ -27,11 +53,21 @@ abstract class Menu
         }
         return NULL;
     }
+    /**
+     * Returns an array of all menu items.
+     *
+     * @return array
+     */
     public function getItems()
     {
         return $this->_items;
     }
 
+    /**
+     * Returns current visiting menu item
+     *
+     * @return MenuItem|null
+     */
     protected function currentItem()
     {
         $urls = App::urls();
@@ -51,6 +87,13 @@ abstract class Menu
             }
         }
     }
+
+    /**
+     * Active the menu item, as well as its parent nodes.
+     *
+     * @param MenuItem $item The item to be activated.
+     * @return MenuItem[] a menu item list from current item to the root.
+     */
     protected function activeCurrent(MenuItem $item)
     {
         $selfId = $item->id;
@@ -66,6 +109,12 @@ abstract class Menu
         return $list;
     }
 
+    /**
+     * Returns menu items as an acl path list.
+     *
+     * @param array $appendRules Additional rules to be append to the result.
+     * @return array
+     */
     public function toAcl($appendRules=array())
     {
         $allow = array();
@@ -85,46 +134,50 @@ abstract class Menu
         }
         return $allow;
     }
-
-
 }
+
+/**
+ * MenuItem class
+ */
 class MenuItem
 {
     /**
      * Title of this menu item.
-     *
      * @var string
      */
     public $name;
 
     /**
-     * Internal routing path of this menu item.
-     *
+     * If this MenuItem is an internal link, specific routing path here.
      * @var string
      */
     public $path;
 
     /**
-     * Icon of this menu item.
-     *
-     * @var string
-     */
-    public $icon;
-
-    /**
-     * External url of this menu item.
-     *
+     * If this MenuItem is an external link, specific the url here.
      * @var string
      */
     public $url;
 
     /**
-     * Stores submenu of this menu item.
-     *
+     * Stores icon css class.
+     * @var string
+     */
+    public $icon;
+
+    /**
+     * Submenu list.
      * @var MenuItem[]
      */
     public $items = array();
 
+    /**
+     * The constructor for MenuItem
+     *
+     * @param string $name Display title of the menu item
+     * @param string $path Path to the menu item
+     * @return void
+     */
     public function __construct($name=NULL, $path=NULL)
     {
         if(func_num_args()) {

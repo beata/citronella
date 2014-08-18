@@ -7,6 +7,8 @@ ini_set('gd.jpeg_ignore_warning', 1);
  * @link http://www.doophp.com/
  * @copyright Copyright &copy; 2009 Leng Sheng Hong
  * @license http://www.doophp.com/license
+ * @package Helper.GdImage
+ * @file
  */
 
 /**
@@ -14,8 +16,6 @@ ini_set('gd.jpeg_ignore_warning', 1);
  *
  * @author Leng Sheng Hong <darkredz@gmail.com>
  * @version $Id: GdImage.php 1000 2009-08-19 21:37:38
- * @package doo.helper
- * @since 1.1
  */
 class GdImage
 {
@@ -51,6 +51,7 @@ class GdImage
 
     /**
      * Suffix name for the rotate image files, eg 203992029_rotated.jpg
+     * @var string
      */
     public $rotateSuffix = '_rotated';
 
@@ -90,6 +91,7 @@ class GdImage
      * @param string $uploadPath  Path of the uploaded image
      * @param string $processPath Path to save the processes images
      * @param bool   $saveFile    To save the processed images
+     * @param bool   $timeAsName  Rename the uploaded file according to current timestamp.
      */
     public function  __construct($uploadPath='', $processPath='', $saveFile=true, $timeAsName=true)
     {
@@ -112,9 +114,9 @@ class GdImage
     /**
      * Creates an image object based on the file type.
      *
-     * @param mixed The variable to store the image resource created.
-     * @param  string   $type Image type, gif, png, jpg
-     * @param  string   $file File name of the image
+     * @param  &resource $img  The variable to store the image resource created.
+     * @param  string   $type Image type, can be 'gif', 'png' or 'jpg'
+     * @param  string   $file Path to the file
      * @return resource
      */
     protected function createImageObject(&$img, $type=NULL, $file)
@@ -144,17 +146,18 @@ class GdImage
     /**
      * Creates an image from a resouce based on the generatedType
      *
-     * @param  resource $img  The image resource
-     * @param  string   $file File name to be stored.
+     * @param  &resource $img  The image resource
+     * @param  string   $file   Path to the output file.
      * @return bool
      */
-    protected function generateImage(&$img, $file=null)
+    protected function generateImage(&$img, $file=NULL)
     {
         switch ($this->generatedType) {
             case 'gif':
                 return imagegif($img, $file);
                 break;
             case 'jpg':
+            case 'jpeg':
                 return imagejpeg($img, $file, $this->generatedQuality);
                 break;
             case 'png':
@@ -178,8 +181,8 @@ class GdImage
      * @param  int         $cropHeight Height to be cropped
      * @param  int         $cropStartX Position x to start cropping
      * @param  int         $cropStartY Position y to start cropping
-     * @param  string      $rename     New file name for the processed image file to be saved.
-     * @return bool|string Returns the generated image file name. Return false if failed.
+     * @param  string      $rename     Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return bool|string Returns the generated image file path. Return false if failed
      */
     public function crop($file, $cropWidth, $cropHeight, $cropStartX=0, $cropStartY=0, $rename='')
     {
@@ -226,8 +229,8 @@ class GdImage
      *
      * @param  string      $file     Image file name
      * @param  int         $rotateBy Amount to rotate the image by in clockwise direction
-     * @param  string      $rename   New file name for the processed image file to be saved
-     * @return bool|string Returns the generated image file name. Return false if failed
+     * @param  string      $rename   Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return bool|string Returns the generated image file path. Return false if failed
      */
     public function rotate($file, $rotateBy, $rename='')
     {
@@ -271,8 +274,8 @@ class GdImage
      * @param  string      $file   The image file name.
      * @param  int         $width  Width of the thumbnail
      * @param  int         $height Height of the thumbnail
-     * @param  string      $rename New file name for the processed image file to be saved.
-     * @return bool|string Returns the generated image file name. Return false if failed.
+     * @param  string      $rename Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return bool|string Returns the generated image file path. Return false if failed
      */
     public function createThumb($file, $width=128, $height=128, $rename='')
     {
@@ -332,8 +335,8 @@ class GdImage
      *
      * @param  string      $file   The image file name.
      * @param  int         $size   Width/height of the thumbnail
-     * @param  string      $rename New file name for the processed image file to be saved.
-     * @return bool|string Returns the generated image file name. Return false if failed.
+     * @param  string      $rename Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return bool|string Returns the generated image file path. Return false if failed.
      */
     public function createSquare($file, $size, $rename='')
     {
@@ -343,14 +346,13 @@ class GdImage
     /**
      * Adaptively Resizes the Image
      *
-     * Resize the image to as close to the provided dimensions as possible, and then crops the
-     * remaining overflow (from the center) to get the image to be the size specified
+     * Resize the image to as close to the provided dimensions as possible.
      *
      * @param  string      $file   The image file name.
      * @param  int         $width
      * @param  int         $height
-     * @param  string      $rename New file name for the processed image file to be saved.
-     * @return bool|string Returns the generated image file name. Return false if failed.
+     * @param  string      $rename Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return bool|string Returns the generated image file path. Return false if failed.
      */
     public function adaptiveResize($file, $width, $height, $rename='')
     {
@@ -405,8 +407,22 @@ class GdImage
         return true;
     }
 
-        public function adaptiveResizeCropExcess($file, $width=128, $height=128, $rename='', $cropOrigin='center')
-        {
+    /**
+     * Adaptively Resizes the Image and crops when exceed
+     *
+     * Resize the image to as close to the provided dimensions as possible, and crops the
+     * remaining overflow (from the center) to get the image to the specific size.
+     *
+     * @param  string      $file   The image file name.
+     * @param  int         $width
+     * @param  int         $height
+     * @param  string      $rename Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @param  string      $cropOrigin When exceed, crop the image from the 'top' or 'center'.
+     * @return bool|string Returns the generated image file path. Return false if failed.
+     */
+
+    public function adaptiveResizeCropExcess($file, $width=128, $height=128, $rename='', $cropOrigin='center')
+    {
         $file = $this->uploadPath . $file;
 
         $imginfo = $this->getInfo($file);
@@ -477,8 +493,8 @@ class GdImage
      * @param  string      $file   The image file name.
      * @param  int         $width  The maximum width of the new image (or null if only setting height)
      * @param  int         $height The maximum height of the new image (or null if only setting width)
-     * @param  string      $rename New file name for the processed image file to be saved.
-     * @return bool|string Returns the generated image file name. Return false if failed.
+     * @param  string      $rename Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return bool|string Returns the generated image file path. Return false if failed.
      */
     public function ratioResize($file, $width=null, $height=null, $rename='')
     {
@@ -831,15 +847,14 @@ class GdImage
         return $img;
     }
 
-
-
-    // Handle File Uploads
+    // Handle File Upload
     /**
      * Save the uploaded image(s) in HTTP File Upload variables
      *
-     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
-     * @param  string       $rename   Rename the uploaded file (without extension)
-     * @return string|array The file name of the uploaded image.
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @param  string       $rename   Set the new file name without extension manually, the image will be placed under `$this->processPath`
+     * @return string|array The file name of the uploaded image, which can be found under `$this->uploadPath`.
      */
     public function uploadImage($fileKey, $fileKeyIdx=FALSE, $rename='')
     {
@@ -879,6 +894,13 @@ class GdImage
         }
     }
 
+    /**
+     * Handles file upload
+     *
+     * @param array $uploadInfo File info extracted from `$_FILES`
+     * @param string $rename New file name under `->uploadPath`
+     * @return string|array The file name of the uploaded image, which can be found under `$this->uploadPath`.
+     */
     private function __handleUpload($uploadInfo, $rename='')
     {
         if (!$uploadInfo['name'] || UPLOAD_ERR_OK != $uploadInfo['error']) {
@@ -910,6 +932,13 @@ class GdImage
         }
     }
 
+    /**
+     * Fetch the file extension of the uploaded file.
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return string|array The file extension of the uploaded image.
+     */
     public function getUploadExtension($fileKey, $fileKeyIdx=FALSE)
     {
         $nameData = $_FILES[$fileKey]['name'];
@@ -933,16 +962,22 @@ class GdImage
         return $result;
     }
 
+    /**
+     * Returns the extension of $filename
+     *
+     * @param string $filename
+     * @return string
+     */
     private static function __getExtension($filename)
     {
         return ($filename ? strtolower(pathinfo($filename, PATHINFO_EXTENSION)) : '');
     }
     /**
-     * Get the uploaded images' format type
+     * Get the image type, strips 'image/' from mime type
      *
-     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
-     * @return string|array The image format type of the uploaded image.
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return string|array The type of the uploaded image (e.g. 'png', 'jpg', 'jpeg', 'gif').
      */
     public function getUploadFormat($fileKey, $fileKeyIdx=FALSE)
     {
@@ -967,15 +1002,23 @@ class GdImage
         return $result;
     }
 
+    /**
+     * Get the image type, strips 'image/' from $mime
+     *
+     * @param  string $mime The mime type.
+     * @return string The type of the uploaded image (e.g. 'png', 'jpg', 'jpeg', 'gif').
+     */
     private static function __getType($mime)
     {
         return ($mime ? str_replace('image/', '', $mime) : NULL);
     }
 
     /**
-     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
-     * @return string|array The image format size of the uploaded image.
+     * Get the uploaded file size in bytes.
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return integer|array The uploaded file size in bytes.
      */
     public function getUploadSize($fileKey, $fileKeyIdx=FALSE)
     {
@@ -1000,6 +1043,13 @@ class GdImage
         return $result;
     }
 
+    /**
+     * Get the uploaded file 'tmp_name'
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return string|array The uploaded file 'tmp_name'
+     */
     public function getUploadTmpName($fileKey, $fileKeyIdx=FALSE)
     {
         $tmpNameData = $_FILES[$fileKey]['tmp_name'];
@@ -1023,6 +1073,13 @@ class GdImage
         return $result;
     }
 
+    /**
+     * Get the uploaded file 'name'
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return string|array The uploaded file 'name'
+     */
     public function getUploadName($fileKey, $fileKeyIdx=FALSE)
     {
         $tmpNameData = $_FILES[$fileKey]['name'];
@@ -1047,11 +1104,11 @@ class GdImage
     }
 
     /**
-     * Get the uploaded images' mime type
+     * Get the mime type of the uploaded file
      *
-     * @param  string       $fileKey The file field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
-     * @return string|array The image format type of the uploaded image.
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return string|array The mime type of the uploaded file
      */
     public function getUploadMIMEType($fileKey, $fileKeyIdx=FALSE)
     {
@@ -1076,6 +1133,13 @@ class GdImage
         return $result;
     }
 
+    /**
+     * Detects whether or not the specific upload input has submitted a file.
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return boolean|array retur ture if the input has submitted a file
+     */
     public function hasSubmitImage($fileKey, $fileKeyIdx=FALSE)
     {
         if (!isset($_FILES[$fileKey]['name'])) {
@@ -1097,6 +1161,15 @@ class GdImage
         }
         return $result;
     }
+
+    /**
+     * Detects whether or not theres an uploading error.
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return void
+     * @throws UploadException when meet uploading error.
+     */
     public function checkUploadError($fileKey, $fileKeyIdx=FALSE)
     {
         App::loadHelper('Upload', false, 'common');
@@ -1131,12 +1204,12 @@ class GdImage
     }
 
     /**
-     * Checks if image extension of the uploaded file(s) is in the allowed list.
+     * Checks if file extension of the uploaded file(s) is in the allowing list.
      *
-     * @param  string $fileKey The file input field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
      * @param  array  $allowExt Allowed file extensions. Default: jpg, jpeg, gif, png
-     * @return bool   Returns true if file extension is in the allowed list.
+     * @return bool   Returns true if the file extension is in the allowing list.
      */
     public function checkImageExtension($fileKey, $fileKeyIdx=FALSE, $allowExt=array('jpg','jpeg','gif','png'))
     {
@@ -1154,8 +1227,9 @@ class GdImage
 
     /**
      * Checks if image mime type of the uploaded file(s) is in the allowed list
-     * @param  string $fileKey  The file field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
      * @param  array  $allowType Allowed image format type. Default: JPEGs, GIFs and PNGs
      * @return bool   Returns true if image mime type is in the allowed list.
      */
@@ -1177,10 +1251,10 @@ class GdImage
     /**
      * Checks if image file size does not exceed the max file size allowed.
      *
-     * @param  string $fileKey The file input field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
      * @param  int    $maxSize  Allowed max file size in kilo bytes.
-     * @return bool   Returns true if file size does not exceed the max file size allowed.
+     * @return bool   Returns true if file size does not exceed the file size limitation.
      */
     public function checkImageSize($fileKey, $fileKeyIdx=FALSE, $maxSize)
     {
@@ -1200,9 +1274,11 @@ class GdImage
     }
 
     /**
-     * @param  string $fileKey The file input field name in $_FILES HTTP File Upload variables
-     * @param  integer $fileKeyIdx
-     * @return bool
+     * Verify that the uploaded file is not empty.
+     *
+     * @param  string       $fileKey  The name of the upload input, the index key in `$_FILES`
+     * @param  string       $fileKeyIdx  If the name of the upload input is an array, specific the input index here.
+     * @return bool|array
      */
     public function checkImageContent($fileKey, $fileKeyIdx=FALSE)
     {
@@ -1219,8 +1295,35 @@ class GdImage
         return $result;
     }
 
+    public function checkImageMinDimension($fileKey, $fileKeyIdx=FALSE, $dimension)
+    {
+        $tmpNameData = $this->getUploadTmpName($fileKey, $fileKeyIdx);
 
+        if (!is_array($tmpNameData)) {
+            $info = $this->getInfo($tmpNameData);
+            return !(
+                ($dimension[0] && $info['width'] < $dimension[0]) ||
+                ($dimension[1] && $info['height'] < $dimension[1])
+            );
+        }
 
+        $result = array();
+        foreach ($tmpNameData as $idx => $tmpName) {
+            $info = $this->getInfo($tmpName);
+            $result[$idx] = !(
+                ($dimension[0] && $info['width'] < $dimension[0]) ||
+                ($dimension[1] && $info['height'] < $dimension[1])
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * fix orientation and re-generate image to strip image for safety reason.
+     *
+     * @param string $imagePath The path to the image.
+     * @return string $imagePath
+     */
     public function afterUpload($imgPath)
     {
         $img = $this->createImageObject($img, NULL, $imgPath);
@@ -1240,6 +1343,13 @@ class GdImage
         return $imgPath;
     }
 
+    /**
+     * Fix image orientation
+     *
+     * @param &resource $img
+     * @param string $filepath The path to the image.
+     * @return boolean
+     */
     private function __imgFixOrientation(&$img, $filepath)
     {
         $imginfo = $this->getInfo($filepath);

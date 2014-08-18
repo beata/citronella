@@ -38,6 +38,7 @@ class FormInputViewModel extends ViewModel
             case 'FormInput_Email':
             case 'FormInput_Url':
             case 'FormInput_Tel':
+            case 'FormInput_Password':
                 $postAttrs['type'] = strtolower(substr($typeClass, strlen('FormInput_')));
                 $postAttrs['value'] = $item->value;
 

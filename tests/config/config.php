@@ -31,6 +31,22 @@ $config = array(
         'rows_per_page'     => 20,      // 每頁顯示20筆資料
         'num_per_page'      => 10,      // 每次顯示10個頁碼
     ),
+
+    // htmlpurifier
+    'htmlpurifier' => array(
+        'default' => array(
+            'HTML.SafeIframe' => true,
+            // can include YouTube and Vimeo only
+            'URI.SafeIframeRegexp' => '%^(http:)?//(www.youtube(?:-nocookie)?.com/embed/|player.vimeo.com/video/)%',
+        ),
+        'admin' => array(
+            'HTML.SafeIframe' => true,
+            'CSS.AllowTricky' => true,
+            // can include any page
+            'URI.SafeIframeRegexp' => '%^(http(s)?:)?//%',
+        )
+    )
+
 );
 
 define('ROOT_PATH', dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR);

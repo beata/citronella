@@ -1,58 +1,141 @@
 <?php
 /**
- * 分頁類別
+ * Pagination class
  *
- * 透過 __get() and __set() 所控制的成員變數
- *
- * 讀與寫
- *  totalRows   - 總筆數
- *
- *  param       - 網址分頁 $_GET 參數名稱
- *  segment     - 網址分頁參數位置（與param則一使用)
- *
- *  paramSort   - 網址排序 $_GET 參數名稱
- *  sortField   - 排序欄位
- *  sortDir     - 排序方向
- *  rowsPerPage - 每頁顯示筆數
- *  numPerPage  - 每頁顯示頁數
- *
- * 唯讀
- *  currentPage - 目前頁數
- *  totalPages  - 總頁數
- *  rowStart    - 本頁資料起始筆數
- *
- * @packaged default
+ * @package Helper.Pagination
+ * @license MIT
+ * @file
  **/
+/**
+ * Pagination Class
+ *
+ * @package Helper.Pagination
+ * @subpackage Helper.Pagination
+ */
 class Pagination
 {
+    /** @name Setting - Can be set from the constructor */
+    //{@
+
+    /**
+     * Total rows
+     * @var integer
+     */
     public $totalRows = 0;
 
+    /**
+     * If you choose fetching current page number from `$_GET`, set the parameter name here.
+     * @var string
+     */
     public $param = 'page';
+
+    /**
+     * If you choose fetching current page number from `$urls->queryString`, set the segment index here.
+     * @var integer
+     */
     public $segment = NULL;
 
+    /**
+     * The key in `$_GET` that represents sort direction.
+     * @var string
+     */
     public $paramSort = 'sort';
+
+    /**
+     * Main ordering rule, specify the column name here.
+     * @var string
+     */
     public $sortField = 'id';
+
+    /**
+     * Main ordering rule, specify the direction here, can be 'asc' or 'desc'
+     * @var string
+     */
     public $sortDir = 'asc';
+
+    /**
+     * Optional ordering rule before main ordering rule, specify an array of column names
+     * @var array
+     */
     public $primarySortField = NULL;
+
+    /**
+     * Optional ordering rule before main ordering rule, specify directions match each `$primarySortField`.
+     * @var array
+     */
     public $primarySortDir = NULL;
+
+    /**
+     * Optional ordering rule after main ordering rule, specify an array of column names
+     * @var array
+     */
     public $secondSortField = NULL;
+
+    /**
+     * Optional ordering rule after main ordering rule, specify directions match each `$secondSortField`.
+     * @var array
+     */
     public $secondSortDir = NULL;
+
+    /**
+     * How many rows to display on each page
+     * @var integer
+     */
     public $rowsPerPage = 20;
+
+    /**
+     * How many page numbers to display on each page
+     * @var integer
+     */
     public $numPerPage = 10;
+
+    /**
+     * Sortable columns, in key-pair format
+     * [column name] => 'display title'
+     * @var array
+     */
     public $sortable = array();
 
-    public $symbalAsc = NULL; // would be defined in the constructor
-    public $symbalDesc = NULL; // would be defined in the constructor
-
-    // readonly members
-    public $currentPage = 0;
-    public $totalPages = 0;
-    public $rowStart = 0;
+    /**
+     * Set sql group by statement (without 'GROUP BY')
+     * @var string
+     */
     public $groupBy;
 
-    public $info;
-    public $infoFormat = NULL; // would be defined in the constructor
+    /**
+     * Set sql order by statement (without 'ORDER BY')
+     * @var string
+     */
+    public $searchOrderBy;
 
+    /**
+     * If set, `$this->info()` will return this property directly.
+     * @var string
+     */
+    public $info;
+
+    /**
+     * Format for `$this->info()`, which outputs `sprintf($infoFormat, $totalRows, $totalPages)`. The default value is set in the constructor.
+     * @var string
+     */
+    public $infoFormat = NULL;
+
+    /**
+     * HTML string for ascending icon. The default value is set in the constructor.
+     * @var string
+     */
+    public $symbalAsc = NULL;
+
+    /**
+     * HTML string for descending icon. The default value is set in the constructor.
+     * @var string
+     */
+    public $symbalDesc = NULL;
+
+    /**
+     * Title for Navication links. The default value is set in the constructor.
+     * @var array
+     */
     public $labels = array(
         'first' => NULL,
         'prev' => NULL,
@@ -60,16 +143,54 @@ class Pagination
         'last' => NULL
     );
 
+    /**
+     * Whether or not to display page number links.
+     * @var boolean
+     */
     public $showNumbers = TRUE;
+
+    /**
+     * Whether or not to display page number dropdown.
+     * @var boolean
+     */
     public $showJumper = FALSE;
+    //@}
+
+    /** @name ReadOnly */
+    //{@
+    /**
+     * Current page number.
+     * @var integer
+     */
+
+    public $currentPage = 0;
+
+    /**
+     * Total pages.
+     * @var integer
+     */
+    public $totalPages = 0;
+
+    /**
+     * Start position for sql query statement
+     * @var integer
+     */
+    public $rowStart = 0;
+    //@}
 
     private $_origDir;
 
+    /**
+     * The constructor
+     *
+     * @param array $config Pass member properties to the controller.
+     * @return void
+     */
     public function __construct($config=array())
     {
-        $this->symbalAsc = ' <i class="glyphicon glyphicon-chevron-up" title="' .  _e('小至大') .  '"></i>';
-        $this->symbalDesc = ' <i class="glyphicon glyphicon-chevron-down" title="' .  _e('大至小') .  '"></i>';
-        $this->infoFormat = _e('有 %s 筆資料，總共 %s 頁');
+        $this->symbalAsc = ' <i class="glyphicon glyphicon-chevron-up" title="' .  _e('Asc.') .  '"></i>';
+        $this->symbalDesc = ' <i class="glyphicon glyphicon-chevron-down" title="' .  _e('Desc.') .  '"></i>';
+        $this->infoFormat = _e('%s Results, %s Pages');
 
         if ( ! array_key_exists('rowsPerPage', $config)) {
             $this->rowsPerPage = App::conf()->pagination->rows_per_page;
@@ -88,10 +209,10 @@ class Pagination
         }
         $this->sortable = $sortable;
         $this->labels = array(
-            'first' => _e('第一頁'),
-            'prev' => _e('上一頁'),
-            'next' => _e('下一頁'),
-            'last' => _e('最末頁')
+            'first' => _e('First'),
+            'prev' => _e('Previous'),
+            'next' => _e('Next'),
+            'last' => _e('Last')
         );
         foreach ($config as $key => $value) {
             if ( is_array($value) && !empty($this->{$key})) {
@@ -125,11 +246,27 @@ class Pagination
             }
         }
     }
+
+    /**
+     * Specify current page number
+     *
+     * @param integer $pageNum The page number to be set.
+     * @return void
+     */
     public function setCurrentPage($pageNum)
     {
         $this->currentPage = min($this->totalPages, max(1, (int) $pageNum));
         $this->rowStart = max(0, ($this->currentPage - 1)) * $this->rowsPerPage;
     }
+
+    /**
+     * Returns info string
+     *
+     * This method will firstly try to return `$this->info`.
+     * If `$this->info` hasn't been set, then will return `$this->infoFormat`, which will be formatted via `sprintf($infoFormat, $totalRows, $totalPages)`
+     *
+     * @return string
+     */
     public function info()
     {
         if ($this->info) {
@@ -138,6 +275,12 @@ class Pagination
 
         return sprintf(_e($this->infoFormat), '<strong>' . $this->totalRows . '</strong>', '<strong>' . $this->totalPages . '</strong>');
     }
+
+    /**
+     * Returns sql LIMIT statement
+     *
+     * @return string
+     */
     public function getSqlLimit()
     {
         $limit = '';
@@ -147,6 +290,12 @@ class Pagination
 
         return $limit;
     }
+
+    /**
+     * Returns sql GROUP BY statement
+     *
+     * @return string
+     */
     public function getSqlGroupBy()
     {
         if ($this->groupBy) {
@@ -155,6 +304,12 @@ class Pagination
 
         return '';
     }
+
+    /**
+     * Returns sql ORDER BY statement
+     *
+     * @return string
+     */
     public function getSqlOrderBy()
     {
         // specify order by directly from search object
@@ -189,6 +344,17 @@ class Pagination
         return ' ORDER BY ' . implode(',', $list);
 
     }
+
+    /**
+     * Output pager links.
+     *
+     * @param boolean $showInfo Whether or not to display info text.
+     * @param array $options
+     *  * wrapperClass      => ''   // css class for widget container
+     *  * paginationClass   => ''   // css class for widget
+     *  * bootstrapVersion  => 3    // bootstrap version
+     * @return void
+     */
     public function pages($showInfo=false, $options=array())
     {
         $options = array_merge(array(
@@ -235,13 +401,15 @@ class Pagination
         );
 
         // first page
-        if ($this->currentPage != 1) {
-            $_url = $this->__pageUrl(1);
-            $class = '';
-        } else {
-            extract($disabled);
+        if (false !== $this->labels['first']) {
+            if ($this->currentPage != 1) {
+                $_url = $this->__pageUrl(1);
+                $class = '';
+            } else {
+                extract($disabled);
+            }
+            echo '<li class="first', $class, '"><a href="', $_url, '">', $this->labels['first'], '</a></li>';
         }
-        echo '<li class="first', $class, '"><a href="', $_url, '">', $this->labels['first'], '</a></li>';
 
         // previous page
         if ($this->currentPage > 1) {
@@ -266,7 +434,7 @@ class Pagination
             foreach ( range($numStart, $numEnd) as $num):
                 echo '<option value="', $num, '"',
                     ( $num == $this->currentPage ? ' selected="selected"' : '' ),
-                    '>', sprintf(__('第 %s 頁'), $num), '</option>';
+                    '>', sprintf(__('Page %s'), $num), '</option>';
             endforeach;
             echo '</select></span></li>';
         }
@@ -281,13 +449,15 @@ class Pagination
         echo '<li class="next', $class, '"><a href="', $_url, '">', $this->labels['next'], '</a></li>';
 
         // last page
-        if ($this->currentPage != $this->totalPages) {
-            $_url =  $this->__pageUrl($this->totalPages);
-            $class = '';
-        } else {
-            extract($disabled);
+        if (false !== $this->labels['last']) {
+            if ($this->currentPage != $this->totalPages) {
+                $_url =  $this->__pageUrl($this->totalPages);
+                $class = '';
+            } else {
+                extract($disabled);
+            }
+            echo '<li class="last', $class, '"><a href="', $_url, '">', $this->labels['last'], '</a></li>';
         }
-        echo '<li class="last', $class, '"><a href="', $_url, '">', $this->labels['last'], '</a></li>';
 
         echo '</ul>';
 
@@ -297,6 +467,26 @@ class Pagination
 
         echo '</div>';
     }
+
+    /**
+     * Return array of page links
+     *
+     * @return array
+     */
+    public function pageLinks()
+    {
+        $links = array();
+        for ($i=1; $i<=$this->totalPages; $i++) {
+            $links['page-' . $i] = str_replace('&amp;', '&', $this->__pageUrl($i));
+        }
+        return $links;
+    }
+    /**
+     * Generates internal url for the page number.
+     *
+     * @param integer $pageNum The page number
+     * @return string
+     */
     private function __pageUrl($pageNum)
     {
         if (NULL === $this->segment) {
@@ -316,6 +506,17 @@ class Pagination
 
         return $urls->urlto(implode('/', $segments));
     }
+
+    /**
+     * Generates sorting link HTML
+     *
+     * @param string $fieldName     DB Column to be sorted
+     * @param string $displayName   Display label for the sorting link
+     * @param array $attrs       HTML attributes for the sorting link
+     * @param string $symbalAsc  Custom ascending icon HTML
+     * @param string $symbalDesc Custom descending icon HTML
+     * @return string
+     */
     public function sortLink($fieldName, $displayName, $attrs=NULL, $symbalAsc=NULL, $symbalDesc=NULL)
     {
         static $url_part = NULL;
@@ -343,6 +544,14 @@ class Pagination
         }
         echo '<a href="'.$url.'"'.($attrs ? ' '.$attrs : '').'>', $displayName, $symbal, '</a>';
     }
+
+    /**
+     * Returns the title text of current sorting column along with the HTML of sorting direction icon.
+     *
+     * @param string $symbalAsc Custom ascending icon HTML
+     * @param string $symbalDesc Custom descending icon HTML
+     * @return string
+     */
     public function currentSort($symbalAsc=NULL, $symbalDesc=NULL)
     {
         $symbal = ($this->sortDir === 'asc'

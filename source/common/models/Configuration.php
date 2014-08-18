@@ -16,8 +16,6 @@ class Configuration extends FormInputModel
                 'key' => 1, 'name' => NULL /* name would be set later in the __construct() */ ),
             'email' => array(
                 'key' => 2, 'name' => NULL),
-            'thirdparty' => array(
-                'key' => 3, 'name' => NULL)
         )
     );
 
@@ -25,9 +23,8 @@ class Configuration extends FormInputModel
     {
         parent::__construct();
 
-        $this->_config['groups']['basic']['name'] = __('基本設定');
-        $this->_config['groups']['email']['name'] = __('郵件設定');
-        $this->_config['groups']['thirdparty']['name'] = __('第三方服務');
+        $this->_config['groups']['basic']['name'] = __('Basic Settings');
+        $this->_config['groups']['email']['name'] = __('Mail Setting');
     }
 
     protected function beforeSave(&$fields)

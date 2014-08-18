@@ -1,5 +1,23 @@
 <?php
-// Array Helper
+/**
+ * Functions
+ *
+ * @license MIT
+ * @file
+ */
+
+/**
+ * @name Array
+ */
+//{@
+/**
+ * Returns array value by $firstKey (and $secondKey)
+ *
+ * @param &array $array The array
+ * @param string|null $firstKey First level. If `$firstKey` is null, this function will return the orignal array.
+ * @param string $secondKey  Second level. If `$secondKey` is null, this function will return the array value at `$firstKey`.
+ * @return mixed
+ */
 function array_get_value(&$array, $firstKey=NULL, $secondKey=NULL)
 {
     if (NULL === $firstKey) {
@@ -14,7 +32,28 @@ function array_get_value(&$array, $firstKey=NULL, $secondKey=NULL)
     }
     return (isset($item[$secondKey]) ? $item[$secondKey] : NULL);
 }
-// Filesystem functions
+//@}
+function array_delete_keys($array, $ignores=array())
+{
+    foreach($ignores as $key) {
+        if (isset($array[$key])) {
+            unset($array[$key]);
+        }
+    }
+    return $array;
+}
+/**
+ * @name FileSystem
+ */
+//{@
+/**
+ * Returns file path
+ *
+ * @param string $dir The folder
+ * @param string $file The file name
+ * @param string $suffix The suffix of file name.
+ * @return string
+ */
 function get_file_path($dir, $file, $suffix=NULL)
 {
     if ( !$file) {
@@ -36,7 +75,7 @@ function get_file_path($dir, $file, $suffix=NULL)
  * 給人類讀的檔案大小
  *
  * @param integer file size in bytes
- * @return string
+ * @return string in Byte/KB/MB/GB/TB/PB
  */
 function formatBytes($bytes)
 {
@@ -54,6 +93,12 @@ function formatBytes($bytes)
 
     return round($bytes, 2) . $unit[$step];
 }
+/**
+ * 傳回以 bytes 單位的數字
+ *
+ * @param string $val example: '10G', '2M' or '6K'
+ * @return integer
+ */
 function returnBytes($val)
 {
     $val = trim($val);
@@ -71,7 +116,16 @@ function returnBytes($val)
     return $val;
 }
 
-// HTTP Functions
+//@}
+/**
+ * @name HTTP
+ */
+//{@
+/**
+ * Detects whether or not current request is a https request.
+ *
+ * @return boolean
+ */
 function is_ssl()
 {
    if ( isset($_SERVER['HTTPS']) ) {
@@ -87,6 +141,11 @@ function is_ssl()
    }
    return false;
 }
+/**
+ * Returns current user ip
+ *
+ * @return string
+ */
 function get_user_ip()
 {
     if (empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
@@ -95,6 +154,11 @@ function get_user_ip()
     $ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
     return $ip[0];
 }
+/**
+ * Returns domain name with http protocal.
+ *
+ * @return string
+ */
 function get_domain_url()
 {
     $is_ssl = isset($_REQUEST['is_ssl']) ? $_REQUEST['is_ssl'] : is_ssl();
@@ -131,11 +195,15 @@ function redirect($location, $exit=true, $code=303, $headerBefore=NULL, $headerA
     if($exit)
         exit;
 }
-// String Functions
+//@}
+/**
+ * @name String
+ */
+//{@
 /**
  * 修正html特殊字，包含nl2br
  *
- * @param string 要修正的字串
+ * @param string $value 要修正的字串
  * @return string
  **/
 function HtmlEncode($value) {
@@ -144,7 +212,7 @@ function HtmlEncode($value) {
 /**
  * 修正html特殊字，不含nl2br
  *
- * @param string 要修正的字串
+ * @param string $value 要修正的字串
  * @return string
  **/
 function HtmlValueEncode($value) {
@@ -153,7 +221,8 @@ function HtmlValueEncode($value) {
 /**
  * 過濾 html 標籤
  *
- * @param string 要過濾的字串
+ * @param string $value 要過濾的字串
+ * @param string $key htmlpurifier 設定鍵，請見 `config/config.php` 的 `htmlpurifier` 選項
  * @return string
  **/
 function HtmlClean($value, $key='default')
@@ -166,6 +235,12 @@ function HtmlClean($value, $key='default')
 
     return $purifiers[$key]->purify($value);
 }
+/**
+ * Create a new HTMLPurifier instance according to htmlpurifier configuration set.
+ *
+ * @param string $key htmlpurifier 設定鍵，請見 `config/config.php` 的 `htmlpurifier` 選項
+ * @return HTMLPurifier
+ */
 function __createHTMLPurifier($key='default')
 {
     if (!class_exists('HTMLPurifier')) {
@@ -216,24 +291,32 @@ function __createHTMLPurifier($key='default')
     $def->addAttribute('font', 'face', 'Text');
     $def->addAttribute('font', 'size', 'Text');
 
+    # css property
+    $def = $pConfig->getCSSDefinition();
+    $def->info['page-break-after'] = new HTMLPurifier_AttrDef_Enum(array(
+        'auto', 'always', 'avoid', 'left', 'right', 'inherit'
+    ));
+
+
     return new HTMLPurifier($pConfig);
 }
 /**
  * 將字串轉為 ASCII Code 以防止爬蟲蒐集email 地址
  *
+ * @param string $email
  * @return string
  */
-function HtmlEncodeEmail($e)
+function HtmlEncodeEmail($email)
 {
     $output = '';
-    $length = strlen($e);
-    for ($i = 0; $i < $length; $i++) { $output .= '&#'.ord($e[$i]).';'; }
+    $length = strlen($email);
+    for ($i = 0; $i < $length; $i++) { $output .= '&#'.ord($email[$i]).';'; }
     return $output;
 }
 /**
  * 修正JavaScript特殊字
  *
- * @param string 要修正的字串
+ * @param string $value 要修正的字串
  * @return string
  **/
 function JsEncode($value) {
@@ -256,18 +339,33 @@ function camelize($str, $upper_first = true)
     }
     return $str;
 }
-function input_required($field)
-{
-    if ( $field['required']) {
-        return ' required="required"';
-    }
-    return '';
-}
+/**
+ * 傳回台灣貨幣格式
+ *
+ * @param integer|float|decimal $number
+ * @param string $sign dollar sign
+ * @return string
+ */
 function currencyTW($number, $sign='NT$')
 {
     return $sign . number_format($number);
 }
-// Datetime
+//@}
+/**
+ * @name DateTime
+ */
+//{@
+/**
+ * 時間簡潔顯示
+ *
+ * 今日的只顯示時間，昨日以前僅顯示日期
+ *
+ * @param string $date 可被 strtotime 成功轉換成時間的時間字串
+ * @param function $callback 昨日前的時間，將會呼叫此回呼函式並將日期字串帶入作為參數
+ * @param string $date_format http://www.php.net/manual/en/function.date.php
+ * @param string $time_format http://www.php.net/manual/en/function.date.php
+ * @return string
+ */
 function shorten_date($date, $callback=NULL, $date_format='Y/m/d', $time_format='H:i:s')
 {
     if ( ! $date) {
@@ -318,14 +416,22 @@ function sql_datetime($time)
     return $time;
 }
 
-// System View Functions
+//@}
+/**
+ * @name UI
+ */
+//{@
 /**
  * 顯示 session 訊息
  *
+ * @param boolean $showDismiss
  * @return void
  **/
 function fresh_message($showDismiss=true)
 {
+    if (isset($_SESSION['fresh_error'])) {
+        fresh_error_message($showDismiss);
+    }
     if ( empty($_SESSION['fresh'])) {
         return;
     }
@@ -333,8 +439,26 @@ function fresh_message($showDismiss=true)
     unset($_SESSION['fresh']);
 }
 /**
+ * 顯示 session error 訊息
+ *
+ * @param boolean $showDismiss
+ * @return void
+ **/
+function fresh_error_message($showDismiss=true)
+{
+    if ( empty($_SESSION['fresh_error'])) {
+        return;
+    }
+    block_message($_SESSION['fresh_error'], 'danger', $showDismiss);
+    unset($_SESSION['fresh_error']);
+}
+
+/**
  * 顯示訊息區塊
  *
+ * @param string $message
+ * @param string $type  bootstrap `.alert-$type`
+ * @param boolean $showDismiss
  * @return void
  **/
 function block_message($message, $type = 'danger', $showDismiss=false) {
@@ -343,6 +467,109 @@ function block_message($message, $type = 'danger', $showDismiss=false) {
         echo '<a class="close" data-dismiss="alert" aria-hidden="true" href="#">&times;</a>';
     }
     echo  $message, '</div>';
+}
+/**
+ * 顯示頁籤 UI
+ *
+ * @param array $list
+ * @param string $current
+ * @param array $options
+ *      'urlPrefix' => '',      // 網址位於 key 之前的部份
+ *      'urlSuffix' => '',      // 網址位於 key 之後的部份
+ *      'urlParams' => NULL,    // 附加網址參數
+ *      'appendLi' => '',       // 附加頁籤
+ *      'nameKey' => NULL,      // 如果 $list value 是 array 的話，將採用這裡的 namekey 的值作為顯示文字
+ *      'tabStyle' => 'nav nav-tabs'    // css class
+ * @return void
+ */
+function ui_tabs($list, $current, $options=array())
+{
+    $options = array_merge(array(
+        'urlPrefix' => '',
+        'urlSuffix' => '',
+        'urlParams' => NULL,
+        'appendLi' => '',
+        'nameKey' => NULL,
+        'tabStyle' => 'nav nav-tabs'
+    ), $options);
+
+    $urls = App::urls();
+
+    echo '<ul class="', $options['tabStyle'],' clearfix">';
+    foreach ( $list as $key => $name ) {
+      if (is_array($name) && NULL !== $options['nameKey']) {
+        $name = $name[$options['nameKey']];
+      }
+      echo '<li'
+        . ( $key == $current ? ' class="active"' : '')
+        . '><a href="' . $urls->urlto($options['urlPrefix'] . $key . $options['urlSuffix'], $options['urlParams']) .'">' . HtmlValueEncode($name) . '</a></li>';
+    }
+    echo $options['appendLi'], '</ul>';
+}
+
+/**
+ * 顯示麵包屑
+ *
+ * @param array $path           路徑列表，格式為
+ *      path => display         或
+ *      path => {
+ *          name => 'display name'
+ *          params => 'url params'
+ *      }
+ * @param string $linkCurrent   目前位置
+ * @param string $beforeText    設定位於麵包屑開始處的文字
+ * @return void
+ */
+function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
+{
+    $urls = App::urls();
+
+    if ( ! $linkCurrent ) {
+        $current = array_pop($path);
+        if (is_array($current)) {
+            $current = $current['name'];
+        }
+    }
+
+    echo '<ul class="breadcrumb">';
+    if ( $beforeText) {
+        echo '<li>', HtmlValueEncode($beforeText), '</li>';
+    }
+    if ( ! empty($path)) {
+        $size = count($path);
+        $count = 0;
+        foreach ( $path as $node => $name) {
+            $params = NULL;
+            if ( is_array($name)) {
+                $params = empty($name['params']) ? NULL : $name['params'];
+                $name = $name['name'];
+            }
+            $count++;
+            echo '<li><a href="' . $urls->urlto($node, $params) . '" data-pjax>' . HtmlValueEncode($name) . '</a></li>';
+        }
+    }
+    if ( ! $linkCurrent ) {
+        echo '<li>' . HtmlValueEncode($current) . '</li>';
+    }
+    echo '</ul>';
+}
+//@}
+/**
+ * @name Form
+ */
+//{@
+/**
+ * 根據 $field 的 'required' 選項，視情況傳回 'required="required"' html 屬性
+ *
+ * @param array $field
+ * @return string
+ */
+function input_required($field)
+{
+    if ( $field['required']) {
+        return ' required="required"';
+    }
+    return '';
 }
 /**
  * 根據傳入的陣列印出 <option> 標籤
@@ -364,7 +591,7 @@ function html_options($array, $default=NULL, $attrs=array())
  * 根據傳入的陣列印出 input:checkbox, input:radio 標籤
  *
  * @param string $type radio or checkbox
- * @param array $array 要印出標籤的鍵值對
+ * @param array $array 要印出的顯示文字鍵值對
  * @param string $name input name
  * @param string $default 預設選取的鍵
  * @param string $attrs 其他要附加到 input 的 html 屬性
@@ -400,6 +627,16 @@ function html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $breakE
         }
     }
 }
+/**
+ * 巢狀 html checkbox 選項
+ *
+ * @param string $type radio or checkbox
+ * @param array $array 要印出的顯示文字鍵值對
+ * @param string $name input name
+ * @param string $default 預設選取的鍵
+ * @param string $attrs 其他要附加到 input 的 html 屬性
+ * @return void
+ */
 function nested_html_checkboxes($type, $array, $name, $default=NULL, $attrs='')
 {
     $i = 0;
@@ -474,6 +711,13 @@ function bs3_html_checkboxes($type, $array, $name, $default=NULL, $attrs='', $br
     }
 }
 
+/**
+ * 輸出 hidden inputs
+ *
+ * @param array $params 要輸出的隱藏欄位鍵值對
+ * @param array $ignores $params 的忽略清單，以鍵做值
+ * @return void
+ */
 function html_hidden_inputs($params, $ignores=NULL)
 {
     if ( NULL !== $ignores ) {
@@ -499,6 +743,10 @@ function html_hidden_inputs($params, $ignores=NULL)
  * @param array $array 要印出標籤的鍵值對
  * @param string $name input name
  * @param string $default 預設選取的鍵
+ * @param string $btn_class Button 的 class attr value
+ * @param string $group_attrs `div.btn-group` 的 html 屬性
+ * @param string|array $button_attrs Button 的 html 屬性，類型為 string 時套用到所有button上
+ * @param string $encoded 顯示文字是否不用再次 HtmlEncode
  * @return void
  */
 function btn_group_radios($array, $name, $default=NULL, $btn_class=NULL, $group_attrs=NULL, $button_attrs=NULL, $encoded=false)
@@ -543,7 +791,7 @@ function show_actions($actions, $default=NULL, $class='input-medium')
         return;
     }
 
-    echo '<label class="control-label padding-right">', _e('選擇的項目'), ': </label><select class="form-control auto-width ' . $class . '" name="action" id="selActions">';
+    echo '<label class="control-label padding-right">', _e('Selected Items'), ': </label><select class="form-control auto-width ' . $class . '" name="action" id="selActions">';
     foreach ( $actions as $action => $info) {
         echo '<option value="'.$action.'"';
         if ( $action === $default) {
@@ -559,6 +807,21 @@ function show_actions($actions, $default=NULL, $class='input-medium')
     echo '</select>';
 }
 
+/**
+ * 顯示含下拉選單的搜尋輸入框
+ *
+ * @param Search $search 必須有以下屬性
+ *  ->byList:   搜尋項目清單
+ *  ->by:       目前的搜尋項目
+ *  ->keyword   目前的搜尋關鍵字
+ * @param array $unsets 表單提交時，不提交的舊GET名稱清單
+ * @param array $inputClass
+ *  [by] = 'input-medium'       搜尋項目下拉選單的 input class
+ *  [query] = 'input-medium'    搜尋關鍵字輸入框的 input class
+ *
+ *
+ * @return void
+ */
 function search_input($search, $unsets=array(), $inputClass=array('by' => 'input-medium', 'query' => 'input-medium'))
 {
     $urls = App::urls();
@@ -566,7 +829,7 @@ function search_input($search, $unsets=array(), $inputClass=array('by' => 'input
   <?php if (count($search->byList) > 1): ?>
   <div class="col-xs-3">
       <select class="form-control <?php echo $inputClass['by'] ?>" name="by">
-      <option value=""><?php echo _e('搜尋欄位') ?></option>
+      <option value=""><?php echo _e('Search By') ?></option>
         <?php html_options($search->byList, $search->by); ?>
       </select>
   </div>
@@ -576,7 +839,7 @@ function search_input($search, $unsets=array(), $inputClass=array('by' => 'input
 
   <div class="input-group col-xs-4 no-padding">
       <input class="form-control <?php echo $inputClass['query'] ?>" type="search" name="keyword" placeholder="<?php echo (count($search->byList) > 1 ? 'Search...' : HtmlValueEncode(current($search->byList))) ?>" value="<?php echo HtmlValueEncode($search->keyword) ?>" />
-      <span class="input-group-btn"><button type="submit" class="btn btn-primary"><?php echo _e('搜尋') ?></button></span>
+      <span class="input-group-btn"><button type="submit" class="btn btn-primary"><?php echo _e('Search') ?></button></span>
   </div>
 <?php
   $unsets[] = 'by';
@@ -584,7 +847,18 @@ function search_input($search, $unsets=array(), $inputClass=array('by' => 'input
   html_hidden_inputs($_GET, $unsets);
 } // search_form
 
-// App View Functions
+//@}
+/**
+ * @name App
+ */
+//{@
+/**
+ * 輸出 google_analytics 追蹤 code
+ *
+ * @param string $account
+ * @param string $domain
+ * @return void
+ */
 function google_analytics($account, $domain)
 {
     if (empty($account)) {
@@ -608,61 +882,19 @@ function google_analytics($account, $domain)
 </script>
 <?php
 }
-function ui_tabs($list, $current, $options=array())
+function meridiem_time($time)
 {
-    $options = array_merge(array(
-        'urlPrefix' => '',
-        'urlSuffix' => '',
-        'urlParams' => NULL,
-        'appendLi' => '',
-        'nameKey' => NULL,
-        'tabStyle' => 'nav nav-tabs'
-    ), $options);
-
-    $urls = App::urls();
-
-    echo '<ul class="', $options['tabStyle'],' clearfix">';
-    foreach ( $list as $key => $name ) {
-      if (is_array($name) && NULL !== $options['nameKey']) {
-        $name = $name[$options['nameKey']];
-      }
-      echo '<li'
-        . ( $key == $current ? ' class="active"' : '')
-        . '><a href="' . $urls->urlto($options['urlPrefix'] . $key . $options['urlSuffix'], $options['urlParams']) .'">' . HtmlValueEncode($name) . '</a></li>';
-    }
-    echo $options['appendLi'], '</ul>';
+    return date('A h:i', strtotime($time));
 }
-
-function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
+function language_links()
 {
     $urls = App::urls();
-
-    if ( ! $linkCurrent ) {
-        $current = array_pop($path);
-        if (is_array($current)) {
-            $current = $current['name'];
-        }
+    $links = array();
+    foreach (App::conf()->locales as $key => $lang) {
+        $q = (isset($_GET['q']) ? $_GET['q'] : '');
+        $params = array_merge($_GET, array('lang' => $key));
+        $links[] = '<a href="' . $urls->urlto($q, $params) . '">' . HtmlValueEncode($lang->name) . '</a>';
     }
-
-    echo '<ul class="breadcrumb no-margin-bottom">';
-    if ( $beforeText) {
-        echo '<li>', HtmlValueEncode($beforeText), '</li>';
-    }
-    if ( ! empty($path)) {
-        $size = count($path);
-        $count = 0;
-        foreach ( $path as $node => $name) {
-            $params = NULL;
-            if ( is_array($name)) {
-                $params = empty($name['params']) ? NULL : $name['params'];
-                $name = $name['name'];
-            }
-            $count++;
-            echo '<li><a href="' . $urls->urlto($node, $params) . '">' . HtmlValueEncode($name) . '</a></li>';
-        }
-    }
-    if ( ! $linkCurrent ) {
-        echo '<li>' . HtmlValueEncode($current) . '</li>';
-    }
-    echo '</ul>';
+    return $links;
 }
+//@}

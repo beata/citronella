@@ -4,58 +4,60 @@ require_once __DIR__ . '/../../../source/sys/functions.php';
 require_once __DIR__ . '/../../../source/sys/core.php';
 require_once __DIR__ . '/../../config/config.php';
 
+App::$id = 'admin';
+
 class Sys_Functions_HtmlCleanTest extends PHPUnit_Framework_TestCase
 {
     public function testAttr_EnableID()
     {
         $string = '<a id="anchor" href="http://example.com">Text</a>';
-        $this->assertEquals('<a id="anchor" href="http://example.com">Text</a>', HtmlClean($string));
+        $this->assertEquals('<a id="anchor" href="http://example.com">Text</a>', HtmlClean($string, 'admin'));
     }
 
     public function testAnchorId()
     {
         $string = '<a id="anchor">Text</a>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
 
     }
 
     public function testAnchorName()
     {
         $string = '<a name="anchor">Text</a>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 
     public function testAnchorLink()
     {
         $string = '<a href="#anchor">Text</a>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 
     public function testLink()
     {
         $string = '<a href="http://aaaa">Text</a>';
-        $this->assertEquals('<a href="http://aaaa">Text</a>', HtmlClean($string));
+        $this->assertEquals('<a href="http://aaaa">Text</a>', HtmlClean($string, 'admin'));
     }
 
     public function testLinkTarget()
     {
         $string = '<a href="http://aaaa" target="_blank">Text</a>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 
     public function testLinkHost()
     {
         $string = '<a href="aaaa.txt">Text</a>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 
     public function testFont()
     {
         $string = '<font style="color:#FF0000;">Font</font>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
 
         $string = '<font face="標楷體" size="5" color="#FF0000">Font</font>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 
     public function testAll()
@@ -85,12 +87,17 @@ class Sys_Functions_HtmlCleanTest extends PHPUnit_Framework_TestCase
     <p>這裡面有兩個因素</p>
 </blockquote>';
 
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 
     public function testUnderline()
     {
         $string = '<u>Text</u>';
-        $this->assertEquals($string, HtmlClean($string));
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
+    }
+    public function testPagebreak()
+    {
+        $string = '<div style="page-break-after:always;"><span style="display:none;"></span></div>';
+        $this->assertEquals($string, HtmlClean($string, 'admin'));
     }
 }

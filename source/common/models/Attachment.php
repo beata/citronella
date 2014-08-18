@@ -38,16 +38,16 @@ abstract class Attachment extends Model
 
         $fields = array(
             $prefix . 'title' => array(
-                'label' => __('檔案標題'), 'required' => false,
+                'label' => __('File Title'), 'required' => false,
             ),
             $prefix . 'sort' => array(
-                'label' => __('排序'), 'required' => false,
+                'label' => __('Seq'), 'required' => false,
                 'callbacks' => array('intval')
             ),
         );
         if (property_exists($this, $prefix . 'mime')) {
             $fields[$prefix . 'mime'] = array(
-                'label' => __('檔案類型'), 'required' => false,
+                'label' => __('File Type'), 'required' => false,
             );
         }
 
@@ -73,7 +73,7 @@ abstract class Attachment extends Model
 
         return array(
             $prefix . 'file' => array(
-                'label' => __('檔案'), 'required' => true,
+                'label' => __('File'), 'required' => true,
                 'dir' => ROOT_PATH . $this->_config['uploadDir'],
                 'fileKey' => $key,
                 'type' => 'file',

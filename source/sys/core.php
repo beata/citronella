@@ -4,6 +4,7 @@
  *
  * @package Core
  * @license MIT
+ * @file
  */
 
 
@@ -16,7 +17,7 @@ class NotFoundException extends Exception
     /**
      * Constructor
      *
-     * If message hasn't been passed to the constructor, the exception will be created with default message __('頁面不存在').
+     * If message hasn't been passed to the constructor, will use 'Page Not Found' as default message.
      *
      * @param string $message The exception message.
      * @param integer $code The exception code
@@ -26,7 +27,7 @@ class NotFoundException extends Exception
     public function __construct($message='', $code=0, Exception $previous=NULL)
     {
         if (!$message) {
-            $message = __('頁面不存在');
+            $message = __('Page Not Found');
         }
         if (phpversion() < 5.3) {
             parent::__construct($message, $code);
@@ -45,64 +46,57 @@ class App
 {
     /**
      * Application ID, which affects loading path such as controllers, models, modules, viewModels, views and helpers.
-     *
      * @var string Default: 'frontend'
      */
     public static $id = 'frontend';
 
     /**
      * An array which stores Urls objects that was created by App::urls() method.
-     *
      * @var Urls[]
      */
     private static $__urlsList = array();
 
     /**
      * Stores Route instance.
-     *
      * @var Route
      */
     private static $__route;
 
     /**
      * Stores Acl instance.
-     *
      * @var Acl
      */
     private static $__acl;
 
     /**
      * Stores config object.
-     *
      * @var stdclass
      */
     private static $__config;
 
     /**
      * Stores PDO instance.
-     *
      * @var PDO
      */
     private static $__db;
 
     /**
      * Stores I18N instance.
-     *
      * @var I18N
      */
     private static $__i18n;
 
 
     /**
-     * Stores values that was stored via App::store()
-     *
+     * Stores values that was stored via App::data()
      * @var mix
      */
     private static $__data;
 
 
+    private static $__db_queries = array();
     /**
-     * Convers array to object.
+     * Convers an array into object.
      *
      * @param array $array The array to be converted.
      * @return object
@@ -182,10 +176,10 @@ class App
     }
 
     /**
-     * Execute controller action
+     * Execute action
      *
-     * - Any action name starts with `_` cannot be executed
-     * - Controller's `$defaultAction` would be used to instead `$actionName` if `$actionName` is unavailable
+     * - Any public action which name starts with `_` cannot be executed
+     * - Controller's `$defaultAction` property would be used if `$actionName` parameter is unavailable
      * - The order of the execution is
      *  1. `$controller->_preAction()`
      *  2. `$controller->$action()`
@@ -200,14 +194,14 @@ class App
     {
         // load file
         if ('_' === $actionName{0}) {
-            throw new NotFoundException(_e('頁面不存在'));
+            throw new NotFoundException(_e('Page Not Found'));
         }
         $class = camelize($controllerName);
         $action = camelize($actionName, false);
 
         $file = ROOT_PATH . self::$id . '/controllers/' . $class . '.php';
         if ( ! file_exists($file)) {
-            throw new NotFoundException(_e('頁面不存在'));
+            throw new NotFoundException(_e('Page Not Found'));
         }
         require $file;
 
@@ -216,7 +210,7 @@ class App
 
         if ( ! is_callable(array($controller, $action))) {
             if (! $controller->defaultAction) {
-                throw new NotFoundException(_e('頁面不存在'));
+                throw new NotFoundException(_e('Page Not Found'));
             }
             $action = $controller->defaultAction;
         }
@@ -311,9 +305,11 @@ class App
             $dsn = 'mysql:host=' . $conf->db->host
                     . ';dbname=' . $conf->db->name
                     . ';charset=' . $conf->db->charset;
-            $db = new PDO($dsn, $conf->db->user, $conf->db->password, array(
+            $options = array(
+                PDO::ATTR_STATEMENT_CLASS => array('MyPDOStatement', array()),
                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES '".$conf->db->charset."';"
-            ));
+            );
+            $db = new PDO($dsn, $conf->db->user, $conf->db->password, $options);
             $db->exec("SET time_zone = '" . $conf->timezone . "'");
             if (phpversion() >= 5.2) {
                 $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
@@ -327,7 +323,7 @@ class App
     }
 
     /**
-     * Returns the specific Urls instance or create a new one.
+     * Returns the Urls instance which matches the `$key` parameter, or create a new one for the `$key`.
      *
      * @param string $key The access key of the Urls instance.
      * @param string $urlBase {@see Urls::__construct()} for more detail.
@@ -335,18 +331,22 @@ class App
      * @return Urls
      * @see Urls::__construct() Urls::__construct()
      */
-    public static function urls($key='primary', $urlBase=NULL, $paramName='q')
+    public static function urls($key='primary', $urlBase=NULL, $paramName='q', $alias=NULL)
     {
         if ( isset(self::$__urlsList[$key])) {
             return self::$__urlsList[$key];
         }
         $urlBase = rtrim($urlBase, '/') . '/';
 
-        return (self::$__urlsList[$key] = new Urls( $urlBase, $paramName ));
+        self::$__urlsList[$key] = new Urls( $urlBase, $paramName );
+
+        $alias && (self::$__urlsList[$alias] = self::$__urlsList[$key]);
+
+        return self::$__urlsList[$key];
     }
 
     /**
-     * Create a new View instance with specific app id.
+     * Create a new View instance for `$appId`.
      *
      * `App::$id` would be used if `$appId` hasn't been set.
      *
@@ -384,7 +384,7 @@ class App
      *
      * @param string $controller The name of the controller to be loaded.
      * @param boolean $createObj Whether or not to return the controller instance.
-     * @param string $appId Load controller under `$appId` directory. If not set, current `App::$id` would be used.
+     * @param string $appId Load `$controller` under `$appId` directory. If not set, current `App::$id` would be used.
      * @return void|Controller
      */
     public static function loadController($controller, $createObj=false, $appId=NULL)
@@ -403,12 +403,16 @@ class App
      *
      * @param string $model The name of the model to be loaded.
      * @param boolean $createObj Whether or not to return the model instance.
-     * @param string $appId Load model under `$appId` directory. If not set, current `App::$id` would be used.
+     * @param string $appId Load `$model` under `$appId` directory. If not set, the model under root path would be used.
      * @return void|Model
      */
     public static function loadModel($model, $createObj=false, $appId=NULL)
     {
-        require_once ROOT_PATH . ($appId ? $appId : self::$id) . '/models/' . $model. '.php';
+        if ($appId) {
+            require_once ROOT_PATH . $appId . '/models/' . $model. '.php';
+        } else {
+            require_once ROOT_PATH . 'models/' . $model. '.php';
+        }
 
         if ($createObj) {
             return new $model;
@@ -421,9 +425,9 @@ class App
      * Path: `{ROOT_PATH}{$appId}/viewModels/{$viewModelName}.php`
      *
      * @param string $viewModelName The name of the view model to be loaded.
-     * @param boolean|Model $createObj Whether or not to return the view model instance. If is Model, it would be set as ViewModel's model.
-     * @param string|array $baseUrl Parameter in ViewModel::__construct(). If is array, each item will be set as member attribute in the view model.
-     * @param string $appId Load view model under `$appId` directory. If not set, current `App::$id` would be used.
+     * @param boolean|Model $createObj Whether or not to return the view model instance. If this parameter is a Model instance, then it will be set as ViewModel's model.
+     * @param string|array $baseUrl Parameter in ViewModel::__construct(). If this parameter is an array, then each item will be set as the property of the view model.
+     * @param string $appId Load `$viewModelName` under `$appId` directory. If not set, current `App::$id` would be used.
      * @return void|ViewModel
      */
     public static function loadViewModel($viewModelName, $createObj=false, $baseUrl=NULL, $appId=NULL)
@@ -443,7 +447,7 @@ class App
      *
      * @param string $class The name of the file to be loaded.
      * @param boolean $createObj Whether or not to return the class instance.
-     * @param string $appId Load helper under `$appId` directory. If not set, current `App::$id` would be used.
+     * @param string $appId Load `$class` under `$appId` directory. If not set, current `App::$id` would be used.
      * @return void|mixed
      */
     public static function loadHelper($class, $createObj=false, $appId=NULL)
@@ -471,13 +475,28 @@ class App
         }
     }
 
-
+    /**
+     * set or get app data
+     *
+     * @param string $key   Any key
+     * @param mixed $value Any value. If you pass this parameter, then this function acts as a setter.
+     * @return mixed
+     */
     public static function data($key, $value=NULL)
     {
         if (func_num_args() > 1) {
             return (self::$__data[$key] = $value);
         }
         return (isset(self::$__data[$key]) ? self::$__data[$key] : NULL);
+    }
+
+    public static function logDBQuery($queryString)
+    {
+        self::$__db_queries[] = $queryString;
+    }
+    public static function queries()
+    {
+        return self::$__db_queries;
     }
 } // END class
 
@@ -489,22 +508,19 @@ class App
 abstract class Controller
 {
     /**
-     * Default action name. If current requested action is unavailable, use this instead.
-     *
+     * Default action name. If current requested action is unavailable, use `$defaultAction` as default action.
      * @var string
      */
     public $defaultAction;
 
     /**
-     * The view data, which would be extracted as variable while rendering view template.
-     *
+     * The view data, which would be extracted as variables while rendering view template.
      * @var array
      */
     public $data = array();
 
     /**
      * Url base segment. Generally used to pass to $urls->urlto().
-     *
      * @var string
      */
     protected $_baseUrl;
@@ -512,7 +528,7 @@ abstract class Controller
     /**
      * Assigns basic variables to data array
      *
-     * Variables assigned to data array are.
+     * Variables assigned to data array are:
      *
      * - `conf`: `App::conf()`.
      * - `urls`: `App::urls()`
@@ -536,7 +552,7 @@ abstract class Controller
      * Will send 404 header on none IIS server.
      *
      * @param boolean $backLink Whether or not to display history back link.
-     * @param string $content The HTML string of message. If not set, it goes with default message: '您所要檢視的頁面不存在'.
+     * @param string $content The HTML string of message. If not set, it goes with default message: 'The page you requested is not exist.'.
      * @param string $layout Which layout to be rendered.
      * @return void
      */
@@ -546,8 +562,8 @@ abstract class Controller
             header('HTTP/1.0 404 Not Found', true, 404);
             header('Status: 404');
         }
-        $this->data['page_title'] = $this->data['window_title'] = _e('404 頁面不存在!');
-        $content = (NULL === $content ? _e('您所要檢視的頁面不存在！') : $content);
+        $this->data['page_title'] = $this->data['window_title'] = _e('404 Page not Found!');
+        $content = (NULL === $content ? _e('The page you requested is not exist.') : $content);
         $this->_showError($content, $backLink, $layout);
     }
 
@@ -583,8 +599,8 @@ abstract class Controller
      * Path: `{ROOT_PATH}{$appId}/modules/{$module}.php`
      *
      * @param string $module The name of the module to be loaded.
-     * @param boolean|array $createObj Whether or not to return the view model instance. If is array, each item will be set as member attribute in the view model.
-     * @param string $appId Load model under `$appId` directory. If not set, current `App::$id` would be used.
+     * @param boolean|array $createObj Whether or not to return the view model instance. If this parameter is an array, each array item will be set as a property to the view model.
+     * @param string $appId Load `$module` under `$appId` directory. If not set, current `App::$id` would be used.
      * @return void|Module
      */
     public function _loadModule($module, $createObj=true, $appId=NULL)
@@ -639,7 +655,6 @@ abstract class BaseController extends Controller
 {
     /**
      * Whether or not to send fail header
-     *
      * @var boolean
      */
     public $_apiSendFailHeader = FALSE;
@@ -662,7 +677,7 @@ abstract class BaseController extends Controller
                 ! ($method = '_api' . camelize($method, true)) ||
                 ! is_callable(array($obj, $method))
             ) {
-                throw new Exception(_e('未定義的方法'));
+                throw new Exception(_e('Undefined method.'));
             }
             $response = $obj->{$method}();
         } catch ( Exception $ex ) {
@@ -694,9 +709,10 @@ abstract class BaseController extends Controller
     }
 
     /**
-     * Process $_POST['select'] with $_POST['action'] then redirect to current REQUEST_URI.
+     * Submission handler
      *
-     * This method will call either `$module->{'_select' . $action}()` or `$controller->{'_select' . $action}()`
+     * Handle `$_POST['select']` according to `$_POST['action']`, then redirect to current REQUEST_URI when completed.
+     * This method will call either `$module->{'_select' . $action}()` or `$controller->{'_select' . $action}()` as handler.
      *
      * @param Module $module Execute `$module` action instead of $controller action
      * @return void
@@ -707,11 +723,11 @@ abstract class BaseController extends Controller
             try {
                 $obj = $module === NULL ? $this : $module;
                 if ( empty($_POST['select']) || ! is_array($_POST['select'])) {
-                    throw new Exception(_e('尚未選擇資料'));
+                    throw new Exception(_e('data selected yet'));
                 }
                 $method = '_selected' . $_POST['action'];
                 if ( ! method_exists($obj, $method)) {
-                    throw new Exception(_e('沒有這個動作'));
+                    throw new Exception(_e('Action undefined.'));
                 }
                 $obj->{$method}();
                 redirect($_SERVER['REQUEST_URI']);
@@ -720,22 +736,35 @@ abstract class BaseController extends Controller
             }
         }
     }
+
     /**
-     * Can be called in either
+     * Submission handler
      *
-     * _handlePost([$module,] $action[, $methodName], $args)
+     * Handle `$_POST` data according to `$action`
+     * This method will call either `$module->{'_handlePost' . $action}()` or `$controller->{'_handlePost' . $action}()` as handler.
      *
+     * This method can be call in the following format:
+     *  * _handlePost([$module,] $action[, $methodName], $args)
+     *
+     * @param Module $module    Execute `$module`'s _handlePost action instead of $controller's
+     * @param string $action    The action name, which should matches with `$_POST['action']`
+     * @param string $method    Actual action name, will be called as the handler: `_handlePost{$method}`
+     * @param array $args       Arugments that will be passed to the handler.
      * @return void
      */
     public function _handlePost($module, $action=NULL, $method=NULL, $args=array())
     {
+        if (!isset($_POST['action'])) {
+            return;
+        }
         if (is_string($module)) {
             $args = $method;
             $method = $action;
             $action = $module;
             $module = NULL;
         }
-        if (!isset($_POST['action']) || $action !== $_POST['action']) {
+        $action = camelize($action, true);
+        if ($action !== camelize($_POST['action'], true)) {
             return;
         }
         if (is_array($method)) {
@@ -744,12 +773,13 @@ abstract class BaseController extends Controller
             $action = $method;
         }
         try {
-            $method = '_handlePost' . camelize($action, true);
+            $method = '_handlePost' . $action;
             $object = ($module ? $module : $this);
             if (is_array($args)) {
                 call_user_func_array(array($object, $method), $args);
+            } else {
+                $object->{$method}();
             }
-            $object->{$method}();
         } catch (Exception $ex) {
             $this->data['error'] = $ex->getMessage();
         }
@@ -766,16 +796,20 @@ abstract class Module
 {
     /**
      * Stores Controller instance
-     *
      * @var Controller
      */
     protected $c;
+
+    /**
+     * Default action name. If current requested action is unavailable, use `$_defaultAction` as default action.
+     * @var string
+     */
     protected $_defaultAction = 'index';
 
     /**
      * Constructor
      *
-     * @param Controller $controller Would be set as Model's controller, which is `$model->c`
+     * @param Controller $controller Would be set as Module's controller, which is `$module->c`
      * @param array $members Each item will be set as $model's member attribute.
      * @return void
      */
@@ -788,6 +822,13 @@ abstract class Module
             }
         }
     }
+
+    /**
+     * Execute action base on `$this->_baseUrlPos`
+     *
+     * @return void
+     * @throws NotFoundException
+     */
     public function doAction()
     {
         $action = camelize(App::urls()->segment($this->_baseUrlPos+1, $this->_defaultAction), true);
@@ -816,30 +857,33 @@ abstract class Module
 abstract class Model
 {
     /**
-     * Force insertion while saving.
-     *
+     * Force insertion while saving, which ignores primary key detection.
      * @var boolean
      */
     protected $_forceInsert = FALSE;
 
+    /**
+     * Whether or not to set last inserted id to `$this->id` automatically
+     * @var boolean
+     */
     protected $_autoLastInsertId = TRUE;
 
+    /**
+     * Whether or not to active db transaction
+     * @var boolean
+     */
     private $__transaciton = FALSE;
 
     /**
      * Model Configuration
-     *
      * * `[primaryKey]` `string` *Required* *Default: 'id'* The primary key column in the table.
-     *
      * * `[table]` `string` *Required* *Default: NULL* The table name.
-     *
      * * `[belongsTo]` `array` *Optional* Defines a set of relational tables.
      *   * `[{TableAlias}]` `array` A relational table.
      *      * `[model]` `string` *Required* The model name of the relational table.
      *      * `[table]` `string` *Required* The name of the relational table.
      *      * `[relKey]` `string` *Required* The column name in main table that represents **[foreignKey].
      *      * `[foreignKey]` `string` *Required* The column in the relational table to be linked.
-     *
      * * `[hasMany]` `array` *Default: undefined* Defines a set of relational tables.
      *   * `[{TableAlias}]` `array` *Required* A relational table.
      *      * `[model]` `string` *Required* The model name of the relational table.
@@ -847,8 +891,6 @@ abstract class Model
      *      * `[relKey]` `string` *Required* The column in main table to be linked.
      *      * `[foreignKey]` `string` *Required* The column name in the relational table that represents **[relKey]**.
      *      * `[whereLink] `string` *Optional* Define custom linking sql.
-     *      * `[where]` `string` *Optional* The where sql after linking sql.
-     *
      * @var array
      */
     protected $_config = array(
@@ -874,9 +916,27 @@ abstract class Model
         Validator::verify($fields, $this, $input);
     }
 
+    /**
+     * Toggle db transaction
+     *
+     * @param boolean $active Whether or not to active db transaction
+     * @return void
+     */
     public function transaction($active=true)
     {
         $this->__transaciton = $active;
+    }
+
+
+    /**
+     * Toggle force insertion
+     *
+     * @param boolean $forceInsert Whether or not to active force insertion
+     * @return void
+     */
+    public function setForceInsert($forceInsert=TRUE)
+    {
+        $this->_forceInsert = $forceInsert;
     }
 
     /**
@@ -907,8 +967,15 @@ abstract class Model
             $this->_save($fields, $input, $verify, $args);
         }
     }
+
     /**
-     * save with transaction
+     * Save input by fields settings in transaction.
+     *
+     * @param &array $fields The fields settings. {@see Validator::verify()}
+     * @param &array $input The input data.
+     * @param boolean $verify Whether or not to verify the input data.
+     * @param mixed $args Any value that would be used in the process.
+     * @return void
      */
     protected function _transactionSave(&$fields, &$input, $verify=TRUE, $args=NULL)
     {
@@ -924,6 +991,15 @@ abstract class Model
         }
     }
 
+    /**
+     * Save input by fields settings.
+     *
+     * @param &array $fields The fields settings. {@see Validator::verify()}
+     * @param &array $input The input data.
+     * @param boolean $verify Whether or not to verify the input data.
+     * @param mixed $args Any value that would be used in the process.
+     * @return void
+     */
     protected function _save(&$fields, &$input, $verify=TRUE, $args=NULL)
     {
         if ( method_exists($this, 'beforeSave')) {
@@ -949,10 +1025,6 @@ abstract class Model
     }
 
 
-    public function setForceInsert($forceInsert=TRUE)
-    {
-        $this->_forceInsert = $forceInsert;
-    }
     /**
      * Insert a record for current model
      *
@@ -1059,6 +1131,16 @@ abstract class Model
         return true;
     }
 
+    /**
+     * Delete files according to $column setting.
+     *
+     * This method just delete files and set `$this->{column}` to an empty string.
+     * *WILL NOT* update database.
+     *
+     * @param array $column The column names of file column
+     * @param array $suffix Pass suffixes array for each file column if there's any file suffixes.
+     * @return void
+     */
     protected function _clearFileColumn($column, $suffixes=NULL)
     {
         if (!$this->{$column}) {
@@ -1206,14 +1288,12 @@ abstract class ViewModel
 {
     /**
      * Stores Model instance
-     *
      * @var Model
      */
     protected $m;
 
     /**
      * Base url of this ViewModel
-     *
      * @var string
      */
     protected $baseUrl;
@@ -1247,16 +1327,13 @@ class View
 {
     /**
      * Stores the application id of this view, affects the loading path of view file.
-     *
      * @var string
      */
     private $__appId;
 
     /**
      * Stores rendered outputs
-     *
      * between `$this->startAddon($addonName)` and `$this->endAddon()`
-     *
      * @var string[]
      */
     private $__addons = array();
@@ -1264,9 +1341,7 @@ class View
 
     /**
      * Stores current addon name
-     *
      * while processing `$this->startAddon($addonName)` and `$this->endAddon()`
-     *
      * @var string
      */
     private $__currentAddonName;
@@ -1294,7 +1369,15 @@ class View
         return ROOT_PATH . ($appId ? $appId : $this->__appId) . '/views/';
     }
 
-    public function hasView($viewFile, $appId=NULL, $viewData=array())
+
+    /**
+     * Detects whether or not the specific view file exists.
+     *
+     * @param string $viewFile the path starts from view's dir.
+     * @param string $appId The view file's application id. If not set, `$this->__appId` would be used.
+     * @return boolean
+     */
+    public function hasView($viewFile, $appId=NULL)
     {
         if ( false === strpos($viewFile, '.')) {
             $file = $this->__getDir($appId) . $viewFile . '.html';
@@ -1345,7 +1428,7 @@ class View
      * * Where does string `{{content_html}}` take in place in the layout file, would be replaced with the rendered view content.
      *
      * @param string $viewFile File name of the view file. The path starts from `{ROOT_PATH}{$appId}/views/`.
-     * @param array $data View data, which would be stored as `$this->data` and extracted as variable in both view and layout file.
+     * @param array $data View data, which would be stored as `$this->data` and extracted as variable in both view and layout files.
      * @param array $options Options that controllers rendering behaviors.<br /><br />
      * * `[appId]` `string`<br />
      *   The view file's application id. If not set, `$this->__appId` would be used.<br /><br />
@@ -1367,7 +1450,11 @@ class View
         extract($options, EXTR_IF_EXISTS);
 
         if (!empty($_SERVER['HTTP_X_PJAX'])) {
-            $layout = FALSE;
+            if ( file_exists($this->__getDir($layoutAppId) . 'layout-pjax.html')) {
+                $layout = 'layout-pjax';
+            } else {
+                $layout = FALSE;
+            }
         }
 
         $this->data = $data;
@@ -1473,52 +1560,55 @@ class Search
 {
     /**
      * Stores sql where conditions.
-     *
      * @var string[]
      */
     public $where = array();
 
     /**
      * Stores params for PDO::execute()
-     *
      * @var array
      */
     public $params = array();
 
     /**
      * The column(s) for GROUP BY statement, only works on:
-     *
      * * `DBHelper::getList()` when its $pager parameter hasn't been set.
      * * `DBHelper::getOne()`
-     *
      * @var string
      */
     public $groupBy;
 
     /**
      * The column(s) for ORDER BY statement, only works on:
-     *
      * * `DBHelper::getList()` when its $pager parameter hasn't been set.
      * * `DBHelper::getOne()`
-     *
      * @var string
      */
     public $orderBy;
 
     /**
      * The number(s) for LIMIT statement, only works on:
-     *
      * * `DBHelper::getList()` when its $pager parameter hasn't been set.
-     *
      * @var string
      */
     public $limit;
 
+    /**
+     * Stores sql having statement
+     * @var array
+     */
     public $having = array();
-    public $havingParams = array();
 
     /**
-     * Returns sql WHERE string from $this->where
+     * Stores parameters for having statement
+     * @var array
+     */
+    public $havingParams = array();
+
+    public $joins = array();
+
+    /**
+     * Returns sql WHERE statement according to `$this->where`, and joins where attribute with `AND`
      *
      * @return string
      */
@@ -1526,6 +1616,14 @@ class Search
     {
         return sizeof($this->where) ? ' WHERE ' . implode(' AND ', $this->where) : '';
     }
+
+    /**
+     * Add WHERE condition(s)
+     *
+     * @param string|array $field
+     * @param string|null $value
+     * @return Search
+     */
     public function where($field, $value=NULL)
     {
         if (!is_array($field)) {
@@ -1539,6 +1637,14 @@ class Search
         }
         return $this;
     }
+
+    /**
+     * Add HAVING condition(s)
+     *
+     * @param string|array $field
+     * @param string|null $value
+     * @return Search
+     */
     public function having($field, $value=NULL)
     {
         if (!is_array($field)) {
@@ -1553,6 +1659,13 @@ class Search
         return $this;
     }
 
+    /**
+     * Generate sql statement for `GROUP BY`, `HAVING`, `ORDER BY` and `LIMIT`
+     *
+     * @param string|array $field
+     * @param string|null $value
+     * @return string
+     */
     public function sqlPagerInfo()
     {
         $pagerInfo = '';
@@ -1572,6 +1685,15 @@ class Search
             $pagerInfo .= ' LIMIT ' . $this->limit;
         }
         return $pagerInfo;
+    }
+    public function join($sql)
+    {
+        $this->joins[] = $sql;
+        return $this;
+    }
+    public function sqlJoin()
+    {
+        return implode(' ', $this->joins);
     }
 }
 
@@ -1848,7 +1970,7 @@ class DBHelper
      */
     public static function getList($model, $search=NULL, Pagination $pager=NULL, $for='list')
     {
-        $where = $params = NULL;
+        $where = $params = $join = NULL;
         extract(self::translateModelSearchArg($model, $search));
 
         $model = new $model;
@@ -1869,13 +1991,20 @@ class DBHelper
                 unset($search->_origOrderBy);
             }
         }
+        $join = $search->sqlJoin();
 
-        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $where . $pagerInfo);
+        $stmt = App::db()->prepare('SELECT ' . $model->selectInfo($for, $search) . ' FROM `' . $mconf['table'] . '` a ' . $join . $where . $pagerInfo);
         $stmt->execute($params);
 
         return $stmt;
     }
 
+    /**
+     * returns the sql statment that ascending ordering result by primary key
+     *
+     * @param string|array $primaryKey
+     * @return string
+     */
     private static function __orderByPrimaryKey($primaryKey)
     {
         if (!is_array($primaryKey)) {
@@ -2197,6 +2326,14 @@ class DBHelper
         return array_combine($array, $array);
     }
 
+
+    /**
+     * Re-arrange the result as a tree
+     *
+     * @param &array $map The result
+     * @param string $parentKey The parent key name, which value should matches with the parent node's `id` attribute
+     * @return array
+     */
     public static function asTree(&$map, $parentKey='parent_id')
     {
         $tree = array();
@@ -2388,7 +2525,7 @@ class Validator
                     }
                     if ( ! empty($opt['required']) ) {
                         throw new ValidatorException(sprintf(
-                                _e('%s: 不能為空'),
+                                _e('%s: cannot be blank.'),
                                 '<strong>' . HtmlValueEncode($label) . '</strong>'));
                     }
 
@@ -2422,7 +2559,7 @@ class Validator
 
         if ( ! ( $timestamp = strtotime($data->{$key}))) {
             throw new ValidatorException(sprintf(
-                    _e('%s: 非正確的時間格式'),
+                    _e('%s: please enter a valid date'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
         }
         switch ($opt['type']) {
@@ -2461,7 +2598,7 @@ class Validator
         if (!is_array($data->{$key})) {
             if ( ! isset($opt['list'][$data->{$key}])) {
                 throw new ValidatorException(sprintf(
-                        _e('%s: 不在允許的清單中'),
+                        _e('%s: field value is unavailable for use.'),
                         '<strong>' . HtmlValueEncode($label) . '</strong>' ));
             }
             return;
@@ -2484,7 +2621,7 @@ class Validator
             }
             if ( ! empty($opt['required'])) {
                 throw new ValidatorException(sprintf(
-                        _e('%s: 必須選取'),
+                        _e('%s: is required.'),
                         '<strong>' . HtmlValueEncode($label) . '</strong>' ));
             }
         }
@@ -2532,33 +2669,42 @@ class Validator
         // validate image
         if ( ! $gd->checkImageExtension($fileKey, $fileKeyIdx)) {
             throw new ValidatorException(sprintf(
-                    _e('%s: 圖片類型只能是 jpg, png, gif'),
+                    _e('%s: only accepts image type in jpg, png or gif'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
         }
 
         if ( ! $gd->checkImageType($fileKey, $fileKeyIdx)) {
             throw new ValidatorException(sprintf(
-                    _e('%s: 圖片類型只能是 jpg, png, gif'),
+                    _e('%s: only accepts image type in jpg, png or gif'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
 
         }
+        if (!empty($opt['min_dimension'])) {
+            if ( ! $gd->checkImageMinDimension($fileKey, $fileKeyIdx, $opt['min_dimension'])) {
+                throw new ValidatorException(sprintf(
+                        _e('%s: the image size must large then %sx%s'),
+                        '<strong>' . HtmlValueEncode($label) . '</strong>',
+                        $opt['min_dimension'][0], $opt['min_dimension'][1]));
+            }
+        }
+
         if ( ! $gd->checkImageSize($fileKey, $fileKeyIdx, $opt['max_size'])) {
             throw new ValidatorException(sprintf(
-                    _e('%s: 圖片檔案大小不能超過 %sK'),
+                    _e('%s: the uploaded file exceeds %sK'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>',
                     $opt['max_size'] ));
         }
 
         if ( ! $gd->checkImageContent($fileKey, $fileKeyIdx)) {
             throw new ValidatorException(sprintf(
-                    _e('%s: 無法解讀的圖片內容'),
+                    _e('%s: The image file can not be read.'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>' ));
         }
 
         // upload
-        if ( ! $source = $gd->uploadImage($fileKey, $fileKeyIdx)) {
+        if ( ! $source = $gd->uploadImage($fileKey, $fileKeyIdx)) { // $source = the uploaded file name.
             throw new ValidatorException(sprintf(
-                    _e('%s: 圖片上傳失敗，請稍後再上傳一次'),
+                    _e('%s: fail to upload. Please try again later.'),
                     '<strong>' . HtmlValueEncode($label) . '</strong>'));
         }
         $data->_new_files[] = $opt['dir'] . $source;
@@ -2739,7 +2885,7 @@ class Validator
     public static function requiredText($value)
     {
         if ( '' === trim(strip_tags($value))) {
-            throw new ValidatorException(__('文字必須填寫'));
+            throw new ValidatorException(__('please enter word.'));
         }
 
         return $value;
@@ -2755,7 +2901,7 @@ class Validator
     public function numeric($value)
     {
         if ( ! is_numeric($value)) {
-            throw new ValidatorException(__('必須是數字'));
+            throw new ValidatorException(__('The value should be in digital numbers.'));
         }
 
         return $value;
@@ -2776,7 +2922,7 @@ class Validator
         $max = (int)$max;
 
         if ( ($value < $min) || ($value > $max)) {
-            throw new ValidatorException(sprintf(__('數字範圍為%s~%s'), $min, $max));
+            throw new ValidatorException(sprintf(__('The range of number is %s~%s'), $min, $max));
         }
 
         return $value;
@@ -2827,7 +2973,7 @@ class Validator
         }
 
         if (!preg_match($pattern, $value)) {
-            throw new ValidatorException( sprintf(__('日期格式不正確!請使用%s格式'), HtmlValueEncode($format)));
+            throw new ValidatorException( sprintf(__('Incorrect date format! Please use date format in %s.'), HtmlValueEncode($format)));
         }
 
         return $value;
@@ -2845,7 +2991,7 @@ class Validator
         $rs = strtotime($value);
 
         if ($rs===false || $rs===-1) {
-            throw new ValidatorException(__('時間格式不正確'));
+            throw new ValidatorException(__('Incorrect time format'));
         }
 
         return $value;
@@ -2862,7 +3008,7 @@ class Validator
     public static function idNumber($value, $identityType='id')
     {
         if ( ! self::__idNumber($value, $identityType)) {
-            throw new ValidatorException(__('請輸入有效的證件編號'));
+            throw new ValidatorException(__('Please enter a valid identity number.'));
         }
 
         return $value;
@@ -2930,7 +3076,7 @@ class Validator
     public static function hexColor($value)
     {
         if (!preg_match("/^#(?:[0-9a-fA-F]{3}){1,2}$/", $value)) {
-            throw new ValidatorException(__('請輸入 HEX 色碼如: #FFF 或 #FFFFFF'));
+            throw new ValidatorException(__('Please enter a valid hex code, eg. #FFF or #FFFFFF'));
         }
 
         return $value;
@@ -2984,7 +3130,7 @@ class Validator
         }
 
         if ( ! DBHelper::count($model, $search) ) {
-            throw new ValidatorException(__('資料不存在'));
+            throw new ValidatorException(__('Record not found.'));
         }
 
         return $value;
@@ -3017,7 +3163,7 @@ class Validator
         }
 
         if ( DBHelper::count(get_class($modelObj), $search) ) {
-            throw new ValidatorException(__('已有資料'));
+            throw new ValidatorException(__('exists already.'));
         }
 
         return $value;
@@ -3058,13 +3204,22 @@ class Validator
         }
         return $value;
     }
+
+    /**
+     * Check captcha code
+     *
+     * @param string $value The value to be checked
+     * @param string $sessionKey The session key of the captcha code.
+     * @return string $value
+     * @throws ValidatorException if the value is not matches the captcha code.
+     */
     public static function captcha($value, $sessionKey='turing_string')
     {
         if (
             !isset($_SESSION[$sessionKey]) ||
             (strtoupper($value) !== strtoupper($_SESSION[$sessionKey]))
         ) {
-            throw new ValidatorException(__('驗證碼錯誤'));
+            throw new ValidatorException(__('inccorct captcha code'));
         }
         return $value;
     }
@@ -3079,57 +3234,46 @@ class Urls
 {
     /**
      * Stores activation status of mod rewrite.
-     *
      * If enabled, the generated url will look like `/subfolder/a/b/c`.
-     *
      * @var string
      **/
     private $_modRewriteEnabled = null;
 
     /**
      * The access key of uri string in $_GET array
-     *
      * @var string
      **/
     private $_paramName = 'q';
 
     /**
      * Stores the requested uri string (ex: $_GET['q']) with trailing slash stripped .
-     *
      * @var string
      */
     private $_queryString;
 
     /**
      * Stores the required uri string in array format.
-     *
      * @var array
      **/
     private $_segments;
 
     /**
      * Stores the path that will be prepended to the generated url.
-     *
      * e.g. With urlBase: `/subfolder/` => generates `/subfolder/?q=a/b/c`
-     *
      * @var string
      **/
     private $_urlBase;
 
     /**
      * Stores the file name of the generated url.
-     *
      * e.g With file name `app.php` => generates `app.php?q=a/b/c`
-     *
      * @var string
      **/
     private $_fileName = '';
 
     /**
      * Stores the base segment of the generated url.
-     *
      * e.g: With segment base `zh-tw` => generates `?q=zh-tw/a/b/c`
-     *
      * @var string
      **/
     private $_segmentBase;
@@ -3399,7 +3543,6 @@ class Route
 {
     /**
      * Stores route config, has the following structure:
-     *
      * <pre>
      *  [__defaultParams]
      *      [controller] string
@@ -3418,21 +3561,18 @@ class Route
 
     /**
      * Stores named route config.
-     *
      * @var array
      */
     private $__namedRoutes = array();
 
     /**
      * Stores default parameters.
-     *
      * @var array
      */
     private $__defaultParams = array();
 
     /**
      * Stores request history.
-     *
      * @var array
      */
     private $__history = array();
@@ -3641,7 +3781,6 @@ class Acl
 {
     /**
      * Stores ACL config, has the following structure:
-     *
      * <pre>
      *  [__default]
      *      [allow] string|array The rule can be '*', '{controller}/*' or '{controller}/{action}', or using an array of rules.
@@ -3670,7 +3809,6 @@ class Acl
 
     /**
      * Stores the role.
-     *
      * @var string
      */
     private $__role = 'anonymous';
@@ -3740,7 +3878,7 @@ class Acl
 
         if ( ! $this->__isAccessible($roleRules)) {
             if ('404' === $roleRules['__failRoute']) {
-                throw new NotFoundException(_e('頁面不存在'));
+                throw new NotFoundException(_e('Page Not Found'));
             }
 
             if ( false === strpos($roleRules['__failRoute'], '/')) {
@@ -3868,7 +4006,6 @@ class I18N
 {
     /**
      * Stores Translations instance.
-     *
      * @var Translations|NOOP_Translations
      */
     private $__translation;
@@ -3896,7 +4033,7 @@ class I18N
             'domain'    => 'default',
         ), $config);
 
-        App::loadVendor('beata/pomo' . DIRECTORY_SEPARATOR . 'po', false, 'common');
+        App::loadVendor('beata/pomo/po', false, 'common');
 
         $this->loadTextDomain($config);
     }
@@ -3954,6 +4091,61 @@ class I18N
         return $this->__translation;
     }
 } // END class
+
+class MyPDOStatement extends PDOStatement
+{
+  protected $_debugValues = null;
+
+  protected function __construct()
+  {
+    // need this empty construct()!
+  }
+
+  public function execute($values=array())
+  {
+    $this->_debugValues = $values;
+    try {
+        if (func_num_args()) {
+          $t = parent::execute($values);
+        } else {
+          $t = parent::execute();
+        }
+      App::logDBQuery($this->_debugQuery());
+    } catch (PDOException $e) {
+      App::logDBQuery($this->_debugQuery());
+      throw $e;
+    }
+
+    return $t;
+  }
+
+  public function _debugQuery($replaced=true)
+  {
+    $q = $this->queryString;
+
+    if (!$replaced) {
+      return $q;
+    }
+
+    return preg_replace_callback('/(:[0-9a-z_]+)/i', array($this, '_debugReplace'), $q);
+  }
+
+  protected function _debugReplace($m)
+  {
+      if (!array_key_exists($m[1], $this->_debugValues)) {
+          return $m[1];
+      }
+    $v = $this->_debugValues[$m[1]];
+    if ($v === null) {
+      return "NULL";
+    }
+    if (!is_numeric($v)) {
+      $v = str_replace("'", "''", $v);
+    }
+
+    return "'". $v ."'";
+  }
+}
 
 /**
  * Returns a translated string

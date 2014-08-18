@@ -1,8 +1,29 @@
 <?php
+/**
+ * File class file
+ *
+ * @package Helper.File
+ * @license MIT
+ * @file
+ */
+
+/**
+ * File Helper
+ */
 class File
 {
+    /**
+     * Stores file permission from constructor, which will be pass to `mkdir()`.
+     * @var string
+     */
     public $chmod;
 
+    /**
+     * The constructor
+     *
+     * @param int $chmod The file permission for `mkdir()`. @see http://www.php.net/mkdir
+     * @return void
+     */
     public function  __construct($chmod=0777)
     {
         $this->chmod = $chmod;
@@ -66,6 +87,13 @@ class File
             }
         }
     }
+
+    /**
+     * Delete files and directories in the `$files` list recursivily.
+     * @param  string   $path       Path to folder/file to be deleted
+     * @param  bool     $deleteSelf true if the folder should be deleted. false if just its contents.
+     * @return void
+     */
     public function deleteAll($files=array(), $deleteSelf=true)
     {
         foreach ($files as $path) {
@@ -113,6 +141,14 @@ class File
         }
     }
 
+    /**
+     * Send file to the http client.
+     *
+     * @param string $filePath The file path
+     * @param string $simpleName 簡短檔名，如 "abc.txt"。當 $fancyName 不可用時，會提示客戶端儲存成 $simpleName，因此 $simpleName 最好取英數字母
+     * @param string $fancyName 複雜檔名，如 "文件名稱.txt"。
+     * @return void
+     */
     public static function send($filePath, $simpleName, $fancyName=NULL)
     {
         if ( ini_get('zlib.output_compression')) {
@@ -123,6 +159,33 @@ class File
         header('Content-Length: ' . filesize($filePath));
         readfile($filePath);
     }
+
+    /**
+     * Send downloading header to the http client.
+     *
+     * @param string $mime The mime type
+     * @param string $transferEncoding "Content-Transfer-Encoding: $transferEncoding"
+     * @param string $simpleName 簡短檔名，如 "abc.txt"。當 $fancyName 不可用時，會提示客戶端儲存成 $simpleName，因此 $simpleName 最好取英數字母
+     * @param string $fancyName 複雜檔名，如 "文件名稱.txt"。
+     * @return void
+     */
+    public static function downloadHeader($mime, $transferEncoding, $simpleName, $fancyName=NULL)
+    {
+        header('Pragma: public'); // required
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Cache-Control: private',false); // required for certain browsers
+        header('Content-type: ' . $mime);
+        if ($fancyName === NULL) {
+            header('Content-Disposition: attachment; filename="' . $simpleName . '"');
+        } else {
+            header('Content-Disposition: attachment; filename="' . $simpleName . '"; filename*=utf-8\'\'' . rawurlencode($fancyName));
+        }
+        if ($transferEncoding) {
+            header('Content-Transfer-Encoding: ' . $transferEncoding);
+        }
+    }
+
     /**
      * 給人類讀的檔案大小
      *
@@ -146,20 +209,4 @@ class File
         return round($bytes, 2) . $unit[$step];
     }
 
-    public static function downloadHeader($mime, $transferEncoding, $simpleName, $fancyName=NULL)
-    {
-        header('Pragma: public'); // required
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-        header('Cache-Control: private',false); // required for certain browsers
-        header('Content-type: ' . $mime);
-        if ($fancyName === NULL) {
-            header('Content-Disposition: attachment; filename="' . $simpleName . '"');
-        } else {
-            header('Content-Disposition: attachment; filename="' . $simpleName . '"; filename*=utf-8\'\'' . rawurlencode($fancyName));
-        }
-        if ($transferEncoding) {
-            header('Content-Transfer-Encoding: ' . $transferEncoding);
-        }
-    }
 }
