@@ -85,6 +85,16 @@ abstract class Menu
             ) {
                 return $item;
             }
+            if (!empty($item->items)) {
+                foreach ($item->items as $subitem) {
+                    if (
+                        ($path === $subitem->path) ||
+                        ($subitem->path . '/' === substr($queryString, 0, strlen($subitem->path)+1))
+                    ) {
+                        return $subitem;
+                    }
+                }
+            }
         }
     }
 
@@ -178,11 +188,14 @@ class MenuItem
      * @param string $path Path to the menu item
      * @return void
      */
-    public function __construct($name=NULL, $path=NULL)
+    public function __construct($name=NULL, $path=NULL, $items=array())
     {
         if(func_num_args()) {
             $this->name = $name;
             $this->path = $path;
+            if (!empty($items)) {
+                $this->items = $items;
+            }
         }
     }
 }

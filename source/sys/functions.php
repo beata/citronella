@@ -14,7 +14,7 @@
  * Returns array value by $firstKey (and $secondKey)
  *
  * @param &array $array The array
- * @param string|null $firstKey First level. If `$firstKey` is null, this function will return the orignal array.
+ * @param string|null $firstKey First level. If `$firstKey` is null, this function will return the original array.
  * @param string $secondKey  Second level. If `$secondKey` is null, this function will return the array value at `$firstKey`.
  * @return mixed
  */
@@ -243,11 +243,6 @@ function HtmlClean($value, $key='default')
  */
 function __createHTMLPurifier($key='default')
 {
-    if (!class_exists('HTMLPurifier')) {
-        App::loadVendor('ezyang/htmlpurifier/library/HTMLPurifier.standalone', false, 'common');
-        App::loadVendor('ezyang/htmlpurifier/library/standalone/HTMLPurifier/Filter/YouTube', false, 'common');
-    }
-
     $appConf = App::conf();
     $settings = isset($appConf->htmlpurifier->{$key})
         ? (array) $appConf->htmlpurifier->{$key}
@@ -416,6 +411,17 @@ function sql_datetime($time)
     return $time;
 }
 
+function timezone_offset($timezone)
+{
+    $now = new DateTime('now', new DateTimeZone($timezone));
+    $mins = $now->getOffset() / 60;
+    $sgn = ($mins < 0 ? -1 : 1);
+    $mins = abs($mins);
+    $hrs = floor($mins / 60);
+    $mins -= $hrs * 60;
+    $offset = sprintf('%+d:%02d', $hrs*$sgn, $mins);
+    return $offset;
+}
 //@}
 /**
  * @name UI

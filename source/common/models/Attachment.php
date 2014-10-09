@@ -12,7 +12,7 @@ abstract class Attachment extends Model
     public ${prefix}title; // title
     public ${prefix}mime; // mime
     public ${prefix}file; // file
-    public ${prefix}sort;
+    public ${prefix}position;
      */
 
     protected $_config = array(
@@ -40,8 +40,8 @@ abstract class Attachment extends Model
             $prefix . 'title' => array(
                 'label' => __('File Title'), 'required' => false,
             ),
-            $prefix . 'sort' => array(
-                'label' => __('Seq'), 'required' => false,
+            $prefix . 'position' => array(
+                'label' => __('Position'), 'required' => false,
                 'callbacks' => array('intval')
             ),
         );
@@ -105,15 +105,16 @@ abstract class Attachment extends Model
     public function bunchUpdate($input)
     {
         $prefix = $this->_config['prefix'];
-        $updates = array($prefix.'title', $prefix.'sort');
+        $updates = array($prefix.'title', $prefix.'position');
         $model = $this->_config['model'];
 
-        $m = new $model;
         foreach ($input as $id => $data) {
-            $m->{$prefix . 'id'} = $id;
-            $m->{$prefix . 'title'} = $data[$prefix.'title'];
-            $m->{$prefix . 'sort'} = (int) $data[$prefix.'sort'];
-            $m->update($updates);
+            $m = DBHelper::getOne($model, $id, 'list');
+            $fields = $m->fields();
+            if (isset($fields['mime'])) {
+                unset($fields['mime']);
+            }
+            $m->save($fields, $data, true);
         }
     }
 
@@ -144,7 +145,7 @@ abstract class Attachment extends Model
                         $m->rawValueFields = array('create_time' => 'NOW()');
                     }
                     if (!$m->{$prefix.'title'}) {
-                        $info = pathinfo($m->{$prefix.'file_orignal_name'});
+                        $info = pathinfo($m->{$prefix.'file_original_name'});
                         if ( !isset($info['filename'])) {
                             $info['filename'] = substr($info['basename'], 0, strlen($info['basename'])-strlen($info['extension'])-1);
                         }
@@ -162,45 +163,14 @@ abstract class Attachment extends Model
 
     public function bunchDelete($ids)
     {
-        $prefix = $this->_config['prefix'];
-        $ids = array_map('intval', $ids);
-
-        $uploadConfig = $this->uploadConfig('dummy');
-        $suffixes = array();
-        if ('image' === $uploadConfig[$prefix.'file']['type']) {
-            $suffixes[$prefix.'file'] = array_keys($uploadConfig[$prefix.'file']['thumbnails']);
-        }
-
-        DBHelper::deleteColumnFile(array(
-            'table' => $this->_config['table'],
-            'columns' => array($prefix.'file'),
-            'where' => '`' . $this->_config['primaryKey'] . '` ' . DBHelper::in($ids) . ' AND `' . $prefix . 'file` != \'\'',
-            'dir' => ROOT_PATH . $this->_config['uploadDir'],
-            'suffixes' => $suffixes
-        ));
-        DBHelper::deleteAll($this->_config['model'], $ids);
+        $model = $this->_config['model'];
+        call_user_func($model.'::deleteAll', $ids);
     }
 
     public function deleteAllByParent($relKeys)
     {
-        $prefix = $this->_config['prefix'];
-        $relKeys = DBHelper::in($relKeys);
-        $where = '`' . $this->_config['belongsTo']['parent']['relKey'] . '` ' . $relKeys;
-
-        $uploadConfig = $this->uploadConfig('dummy');
-        $suffixes = array();
-        if ('image' === $uploadConfig[$prefix.'file']['type']) {
-            $suffixes[$prefix.'file'] = array_keys($uploadConfig[$prefix.'file']['thumbnails']);
-        }
-
-        DBHelper::deleteColumnFile(array(
-            'table' => $this->_config['table'],
-            'columns' => array($prefix.'file'),
-            'where' => $where . ' AND `' . $prefix . 'file` != \'\'',
-            'dir' => ROOT_PATH . $this->_config['uploadDir'],
-            'suffixes' => $suffixes
-        ));
-        App::db()->exec('DELETE FROM `' . $this->_config['table'] . '` WHERE ' . $where);
+        $model = $this->_config['model'];
+        call_user_func($model.'::deleteAllByColumn', $this->_config['belongsTo']['parent']['relKey'], $relKeys);
     }
 
     public function getListByParent($relKey)
@@ -214,7 +184,7 @@ abstract class Attachment extends Model
         $search = new Search;
         $search->where[] = '`' . $this->_config['belongsTo']['parent']['relKey'] . '` = ?';
         $search->params[] = $relKey;
-        $search->orderBy = '`' . $prefix . 'sort` ASC';
+        $search->orderBy = '`' . $prefix . 'position` ASC';
 
         return DBHelper::getList($this->_config['model'], $search, NULL);
     }
@@ -225,11 +195,14 @@ abstract class Attachment extends Model
 
         $select = array();
         switch ($for) {
+            case 'id':
+                return '`id`';
+
             case 'list':
                 $select[] = '`' . $prefix . 'id`,'
                     . ' `' . $prefix . 'title`,'
                     . ' `' . $prefix . 'file`,'
-                    . ' `' . $prefix . 'sort`';
+                    . ' `' . $prefix . 'position`';
 
                 if (property_exists($this, $prefix.'mime')){
                     $select[] = ' `' . $prefix . 'mime`';

@@ -507,6 +507,11 @@ class Pagination
         return $urls->urlto(implode('/', $segments));
     }
 
+    public function pageUrl($num)
+    {
+        return $this->__pageUrl($num);
+    }
+
     /**
      * Generates sorting link HTML
      *

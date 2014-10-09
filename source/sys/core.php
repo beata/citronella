@@ -310,7 +310,7 @@ class App
                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES '".$conf->db->charset."';"
             );
             $db = new PDO($dsn, $conf->db->user, $conf->db->password, $options);
-            $db->exec("SET time_zone = '" . $conf->timezone . "'");
+            $db->exec("SET time_zone = '" . timezone_offset($conf->timezone) . "'");
             if (phpversion() >= 5.2) {
                 $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
             }
@@ -1277,6 +1277,16 @@ abstract class Model
         }
     }
 
+    protected static function _deleteAllByColumn($className, $columnName, $columnValues)
+    {
+        $search = new Search;
+        $search->where[] = '`' . $columnName . '` ' . DBHelper::in($columnValues);
+        $ids = DBHelper::getList($className, $search, NULL, 'id')->fetchAll(PDO::FETCH_COLUMN);
+        if (empty($ids)) {
+            return;
+        }
+        call_user_func($className . '::deleteAll', $ids);
+    }
 }
 
 /**
@@ -2736,7 +2746,7 @@ class Validator
             (isset($opt['cropOrigin']) ? $opt['cropOrigin'] : NULL)
         );
         $data->{$key} = $input[$key] = $source;
-        $data->{$key.'_orignal_name'} = $gd->getUploadName($fileKey, $fileKeyIdx);
+        $data->{$key.'_original_name'} = $gd->getUploadName($fileKey, $fileKeyIdx);
         $data->{$key.'_type'} = $input[$key.'_type'] = $gd->getUploadMIMEType($fileKey, $fileKeyIdx);
 
         if ( isset($opt['thumbnails'])) {
@@ -2819,7 +2829,7 @@ class Validator
             // assign new file to $data object
             $data->{$key} = $input[$key] = $newFile;
             $data->{$key.'_type'} = $input[$key.'_type'] = $uploader->getFileType();
-            $data->{$key.'_orignal_name'} = $input[$key.'_orignal_name'] = $uploader->getOrignalName();
+            $data->{$key.'_original_name'} = $input[$key.'_original_name'] = $uploader->getOrignalName();
 
             // add to _new_files array
             if ( ! is_array($data->{$key})) {

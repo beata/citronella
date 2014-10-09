@@ -33,7 +33,7 @@ class Upload
      * Whether or not to rename the uploaded file.
      * If your set this value to:
      *  * TRUE - The uploaded file will be renamed by current timestamp.
-     *  * FALSE - The uploaded file will keep its orignal name.
+     *  * FALSE - The uploaded file will keep its original name.
      *  * Any string - The uploaded file will be renamed to this value.
      * @var boolean|string
      */
