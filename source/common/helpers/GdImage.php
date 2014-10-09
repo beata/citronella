@@ -161,13 +161,8 @@ class GdImage
                 return imagejpeg($img, $file, $this->generatedQuality);
                 break;
             case 'png':
-                if($this->generatedQuality>9)
-                        $quality = 9;
-                else
-                    $quality = $this->generatedQuality;
-
+                $quality = 0;
                 return imagepng($img, $file, $quality);
-                break;
             default:
                 return false;
         }
@@ -202,6 +197,7 @@ class GdImage
         $cropimg = imagecreatetruecolor($cropWidth,$cropHeight);
         $width = $imginfo['width'];
         $height = $imginfo['height'];
+        $this->setPNGTransparent($cropimg, $imginfo['type'], $cropWidth, $cropHeight);
 
         //Crop now
         imagecopyresampled($cropimg, $img, 0, 0, $cropStartX, $cropStartY, $width, $height, $width, $height);
@@ -299,13 +295,14 @@ class GdImage
 
         //maintain ratio
         if($oriW/$width > $oriH/$height)
-            $height = round($oriH * $width/$oriW);
+            $height = (int)round($oriH * $width/$oriW);
         else
-            $width = round($oriW * $height/$oriH);
+            $width = (int)round($oriW * $height/$oriH);
 
         //For GD version 2.0.1 only
         if (function_exists('imagecreatetruecolor')) {
             $newImg = imagecreatetruecolor($width, $height);
+            $this->setPNGTransparent($newImg, $imginfo['type'], $width, $height);
             imagecopyresampled($newImg, $img, 0, 0, 0, 0, $width, $height, $imginfo['width'], $imginfo['height']);
         } else {
             $newImg = imagecreate($width, $height);
@@ -383,6 +380,7 @@ class GdImage
         //For GD version 2.0.1 only
         if (function_exists('imagecreatetruecolor')) {
             $newImg = imagecreatetruecolor($width, $height);
+            $this->setPNGTransparent($newImg, $imginfo['type'], $width, $height);
             imagecopyresampled($newImg, $img, ($width-$resizeWidth)/2, ($height-$resizeHeight)/2, 0, 0, $resizeWidth, $resizeHeight, $imginfo['width'], $imginfo['height']);
         } else {
             $newImg = imagecreate($width, $height);
@@ -455,6 +453,7 @@ class GdImage
         //For GD version 2.0.1 only
         if (function_exists('imagecreatetruecolor')) {
             $newImg = imagecreatetruecolor($width, $height);
+            $this->setPNGTransparent($newImg, $imginfo['type'], $width, $height);
 
             imagecopyresampled($newImg, $img, 0, 0, $srcX, $srcY, $width, $height, $srcW, $srcH);
         } else {
@@ -530,6 +529,7 @@ class GdImage
 
         if (function_exists('imagecreatetruecolor')) {
             $newImg = imagecreatetruecolor($resizeWidth, $resizeHeight);
+            $this->setPNGTransparent($newImg, $imginfo['type'], $resizeWidth, $resizeHeight);
             imagecopyresampled($newImg, $img, 0, 0, 0, 0, $resizeWidth, $resizeHeight, $imginfo['width'], $imginfo['height']);
         } else {
             $newImg = imagecreate($resizeWidth, $resizeHeight);
@@ -592,6 +592,7 @@ class GdImage
 
         if (function_exists('imagecreatetruecolor')) {
             $new = imagecreatetruecolor($width, $height);
+            $this->setPNGTransparent($new, $imginfo['type'], $width, $height);
             imagecopyresampled($new, $img, 0, 0, 0, 0, $width, $height, $imageInfo['width'], $imageInfo['height']);
         } else {
             $new = imagecreate($width, $height);
@@ -680,6 +681,7 @@ class GdImage
 
         if (function_exists('imagecreatetruecolor')) {
             $new = imagecreatetruecolor($imgInfo['width'], $imgInfo['height']);
+            $this->setPNGTransparent($new, $imginfo['type'], $imgInfo['width'], $imgInfo['height']);
             imagecopyresampled($new, $img, 0, 0, 0, 0, $imgInfo['width'], $imgInfo['height'], $imgInfo['width'], $imgInfo['height']);
         } else {
             $new = imagecreate($imgInfo['width'], $imgInfo['height']);
@@ -733,6 +735,7 @@ class GdImage
         //For GD version 2.0.1 only
         if (function_exists('imagecreatetruecolor')) {
             $newImg = imagecreatetruecolor($width, $height);
+            $this->setPNGTransparent($newImg, $imginfo['type'], $width, $height);
         } else {
             $newImg = imagecreate($width, $height);
         }
@@ -1330,15 +1333,24 @@ class GdImage
         if (!$img) {
             return false;
         }
-
         $this->__imgFixOrientation($img, $imgPath);
+
+        $imginfo = $this->getInfo($imgPath);
+        $type = $imginfo['type'];
+
+        $width = imagesx($img);
+        $height = imagesy($img);
+        $newImg = imagecreatetruecolor($width, $height);
+        $this->setPNGTransparent($newImg, $type, $width, $height);
+        imagecopyresampled($newImg, $img, 0, 0, 0, 0, $width, $height, $width, $height);
 
         if (file_exists($imgPath)) {
             unlink($imgPath);
         }
-        $this->generateImage($img, $imgPath);
 
+        $this->generateImage($newImg, $imgPath);
         imagedestroy($img);
+        imagedestroy($newImg);
 
         return $imgPath;
     }
@@ -1378,5 +1390,21 @@ class GdImage
         }
 
         return true;
+    }
+
+    public function setPNGTransparent(&$img, $type, $width, $height)
+    {
+        switch ($type) {
+            case 1: // gif
+            case 3: // png
+                // Turn off alpha blending and set alpha flag
+                imagealphablending($img, false);
+                imagesavealpha($img, true);
+                $transparent = imagecolorallocatealpha($img, 255, 255, 255, 127);
+                imagefilledrectangle($img, 0, 0, $width, $height, $transparent);
+                break;
+            default:
+                break;
+        }
     }
 }
