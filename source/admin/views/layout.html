@@ -1,0 +1,107 @@
+<?php header('Content-Type: text/html; charset="'.$conf->encoding.'"'); ?>
+<!DOCTYPE HTML>
+<!--[if lt IE 7]> <html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="<?php echo $conf->language_code ?>"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js lt-ie9 lt-ie8" lang="<?php echo $conf->language_code ?>"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js lt-ie9" lang="<?php echo $conf->language_code ?>"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="<?php echo $conf->language_code ?>"> <!--<![endif]-->
+  <head>
+    <meta charset="<?php echo $conf->encoding ?>">
+    <!--[if IE]><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><![endif]-->
+    <title><?php if (isset($window_title) && $window_title): echo HtmlValueEncode($window_title), ' | '; endif; echo HtmlValueEncode($conf->site_name) ?></title>
+    <?php $this->showAddon('lib-css') ?>
+    <link rel="stylesheet" href="<?php echo ASSETS_URL ?>css/admin.css">
+    <!--[if lt IE 9]>
+    <link rel="stylesheet" href="<?php echo ASSETS_URL ?>css/admin.ie.css">
+    <![endif]-->
+    <script src="<?php echo ASSETS_URL ?>js/libs/modernizr.custom.min.js"></script>
+  </head>
+  <body class="page-<?php echo HtmlValueEncode($_REQUEST['controller']) ?> <?php if ( isset($menu)): echo ' with-sidebar'; endif; ?>">
+
+    <nav class="navbar navbar-default no-margin" role="navigation">
+      <div class="container-fluid">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="<?php echo $urls->urlto('') ?>"><?php echo HtmlValueEncode($conf->site_name) ?></a>
+        </div>
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <div class="collapse navbar-collapse" id="navbar-collapse">
+          <?php if ( isset($menu) ): ?>
+          <ul class="nav navbar-nav">
+            <?php echo show_menu($menu->getTree()) ?>
+          </ul>
+          <?php endif; ?>
+          <?php if ( $has_login): ?>
+          <ul class="nav navbar-nav navbar-right">
+            <li>
+              <a href="#">
+                <?php echo sprintf(_e('Hello, %s'), HtmlValueEncode($_SESSION['admin']->name)) ?>
+              </a>
+            </li>
+            <li><a href="<?php echo $urls->urlto('auth/logout') ?>"><?php echo _e('Logout') ?></a></li>
+          </ul>
+          <?php endif; ?>
+
+        </div><!-- /.navbar-collapse -->
+      </div><!-- /.container-fluid -->
+    </nav>
+    <?php if ( isset($breadcrumbs) && count($breadcrumbs) > 1): breadcrumbs($breadcrumbs); endif; ?>
+
+    <div class="body">
+      <div class="container">
+        <div class="row margin-top">
+          <?php
+            if ('auth' === $_REQUEST['controller']):
+              $body_class = 'col-md-offset-3 col-md-6';
+            else:
+              $body_class = 'col-md-12';
+            endif;
+          ?>
+          <div class="<?php echo $body_class ?>">
+            <div class="main">
+              <?php if ( !empty($page_title) && 'auth' !== $_REQUEST['controller']): ?>
+              <h2 class="page-title no-margin-top"><?php echo HtmlValueEncode($page_title) ?></h2>
+              <?php endif; ?>
+
+              <?php fresh_message() ?>
+              {{content_html}}
+            </div><!-- /main -->
+          </div>
+
+        </div>
+
+      </div><!-- /container -->
+    </div><!-- /body -->
+
+    <div class="footer">
+      <div class="container text-center">
+      </div>
+    </div>
+
+    <!--[if lt IE 8 ]>
+    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
+    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'overlay'})})</script>
+    <![endif]-->
+    <script type="text/javascript" charset="utf-8">
+      Site = {
+        RootUrl: '<?php echo ROOT_URL ?>',
+        AssetsUrl: '<?php echo ASSETS_URL ?>'
+      };
+    </script>
+    <script src="<?php echo ASSETS_URL ?>js/libs/jquery-1.9.1.min.js"></script>
+    <!--[if lt IE 8 ]><script defer src="<?php echo ASSETS_URL ?>js/libs/bootstrap-legacy-ie.min.js" data-bootstrap-legacy-ie data-target="div.main" data-method="append"></script><![endif]-->
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="<?php echo ASSETS_URL ?>js/ie.min.js"></script>
+    <![endif]-->
+    <?php $this->showAddon('lib-scripts') ?>
+    <script defer src="<?php echo ASSETS_URL ?>js/admin-lib.min.js"></script>
+    <script defer src="<?php echo ASSETS_URL ?>js/lang/admin/<?php echo $conf->language ?>.js"></script>
+    <script defer src="<?php echo ASSETS_URL ?>js/admin.min.js"></script>
+    <?php $this->showAddon('scripts') ?>
+  </body>
+</html>

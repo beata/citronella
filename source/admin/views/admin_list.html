@@ -1,0 +1,71 @@
+<form method="get" action="">
+  <div class="well clearfix margin-bottom-half">
+    <div class="row">
+      <?php search_input($search, array('status', 'page')) ?>
+    </div>
+  </div>
+  <div class="margin-bottom">
+    <a class="btn btn-primary margin-right" href="<?php echo $urls->urlto($baseUrl . '/create') ?>"><i class="glyphicon glyphicon-plus"></i> <?php echo _e('New Account') ?></a>
+    <?php btn_group_radios($search->statusList, 'status', $search->status, 'btn-default', 'data-submit-now'); ?>
+  </div>
+</form>
+<!-- /search -->
+
+<?php if ( ! $pager->totalRows ): block_message(_e('No Result.'), 'info'); else: ?>
+<form class="form-inline" method="post" action="" id="listForm" data-confirm-selected="<?php echo _e('Please select') ?>">
+
+    <?php if ( isset($error)): block_message($error, 'danger'); endif; ?>
+
+    <table class="table table-striped table-bordered table-condensed table-vertical-middle table-text-center">
+      <thead>
+        <tr>
+          <?php
+            foreach ($pager->sortable as $key => $label):
+              echo '<th>', $pager->sortLink($key, $label), '</th>';
+            endforeach;
+          ?>
+          <th class="cell-min nowrap"><?php echo _e('Edit') ?></th>
+          <th class="cell-min nowrap"><input type="checkbox" data-toggle="checkbox" data-rel="tooltip" title="<?php echo _e('Select All') ?>" /></th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <?php while ( $item = $list->fetchObject($model)): ?>
+        <tr>
+          <td class="text-left"><?php echo HtmlValueEncode($item->account) ?></td>
+          <td class="text-left"><a href="<?php echo $urls->urlto($baseUrl . '/edit/' . $item->id, compact('backUrl')) ?>" title="<?php echo _e('View Detail') ?>"><?php echo HtmlValueEncode($item->name) ?></a></td>
+          <td class="text-left"><?php echo HtmlValueEncode($item->email) ?></td>
+          <td><?php echo $item->last_login ?></td>
+          <td><?php echo $item->join_time ?></td>
+          <td><?php echo HtmlValueEncode($search->statusList[$item->status]) ?></td>
+          <td class="cell-min nowrap"><a class="btn btn-primary btn-sm" href="<?php echo $urls->urlto($baseUrl . '/edit/' . $item->id, compact('backUrl')) ?>" title="<?php echo _e('Edit') ?>"><i class="glyphicon glyphicon-edit"></i></a></td>
+          <td class="cell-min nowrap"><input class="select" type="checkbox" name="select[<?php echo $item->id ?>]" value="<?php echo $item->id ?>" /></td>
+        </tr>
+        <?php endwhile; ?>
+      </tbody>
+    </table><!-- /list -->
+    <div class="list-actions text-right">
+      <?php
+      show_actions(array(
+        'Delete' => array(
+          'name' => __('Delete'),
+          'data' => array( 'confirm' => __("Sure to delete?\nWill delete data related to these accounts." ))
+        ),
+        'ChangeStatus' => array(
+          'name' => __('Change Status'),
+          'data' => array( 'open' => '#changeStatus' )
+        )
+      ), (isset($_POST['action']) ? $_POST['action'] : null));
+      ?>
+      <span class="subactions hide" id="changeStatus">
+        <select class="form-control auto-width" name="status">
+          <?php
+          unset($search->statusList['-1']);
+          html_options($search->statusList, (isset($_POST['status']) ? $_POST['status'] : null)); ?>
+        </select>
+      </span>
+      <button type="submit" class="btn btn-primary"><?php echo _e('Apply') ?></button>
+    </div>
+  </form>
+  <?php $pager->pages(true) ?>
+<?php endif; // end if list ?>

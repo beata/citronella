@@ -1,0 +1,28 @@
+table col[class*="col-"] {
+    position: static;
+}
+table {
+  td,
+  th {
+    &[class*="col-"] {
+      position: static;
+    }
+  }
+}
+
+.table-popup-error {
+    td {
+        position: relative;
+    }
+    .help-block {
+        position: absolute;
+        padding: .25em;
+        background: @state-danger-text;
+        color: #FFF;
+        border-radius: .25em;
+        z-index: 1;
+    }
+    .has-error .help-block {
+        color: white;
+    }
+}

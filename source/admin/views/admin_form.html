@@ -1,0 +1,97 @@
+<form class="form-horizontal" method="post" data-validate="validate">
+
+  <?php if ( isset($error)): block_message($error, 'danger'); endif; ?>
+
+  <?php if ( $data->isNew ): ?>
+
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="account"><?php echo HtmlValueEncode($fields['account']['label']) ?></label>
+    <div class="col-md-3">
+      <input class="form-control" id="account" name="account" size="30" type="text" maxlength="128" value="<?php echo HtmlValueEncode($data->account) ?>" remote="<?php echo $urls->urlto($baseUrl . '/check-account') ?>"<?php echo input_required($fields['account']) ?> />
+    </div>
+    <p class="help-block"><?php echo HtmlValueEncode($fields['account']['title']) ?></p>
+  </div><!-- /form-group -->
+
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="password"><?php echo HtmlValueEncode($fields['password']['label']) ?></label>
+    <div class="col-md-3">
+      <input class="form-control" id="password" name="password" size="30" type="password" maxlength="100" <?php echo input_required($fields['password']) ?> />
+    </div>
+  </div><!-- /form-group -->
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="confirm_password"><?php echo _e('Confirm Password') ?></label>
+    <div class="col-md-3">
+      <input class="form-control" id="confirm_password" name="confirm_password" size="30" type="password" maxlength="100" equalTo="#password" required="required" />
+    </div>
+  </div><!-- /form-group -->
+
+  <?php else: ?>
+
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="account"><?php echo _e('Account') ?></label>
+    <div class="col-md-3">
+      <input class="form-control" id="account" name="account" size="30" type="text" maxlength="128" value="<?php echo HtmlValueEncode($data->account) ?>" readonly="readonly" /> <a data-toggle="collapse" data-target="#togglePassword">(<?php echo _e('Change Password') ?>)</a>
+    </div>
+  </div><!-- /form-group -->
+  <div id="togglePassword" class="collapse">
+    <div class="form-group">
+      <label class="col-md-2 control-label" for="password"><?php echo HtmlValueEncode($fields['password']['label']) ?></label>
+      <div class="col-md-3">
+        <input class="form-control" id="password" name="password" size="30" type="password" maxlength="100"<?php echo input_required($fields['password']) ?> />
+      </div>
+    </div><!-- /form-group -->
+    <div class="form-group">
+      <label class="col-md-2 control-label" for="confirm_password"><?php echo _e('Confirm Password') ?></label>
+      <div class="col-md-3">
+        <input class="form-control" id="confirm_password" name="confirm_password" size="30" type="password" maxlength="100" equalTo="#password" required="required" />
+      </div>
+    </div><!-- /form-group -->
+  </div>
+
+  <?php endif; ?>
+
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="name"><?php echo HtmlValueEncode($fields['name']['label']) ?></label>
+    <div class="col-md-3">
+      <input class="form-control" id="name" name="name" size="30" type="text" maxlength="100" value="<?php echo HtmlValueEncode($data->name) ?>"<?php echo input_required($fields['name']) ?> />
+    </div>
+  </div><!-- /form-group -->
+
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="email"><?php echo HtmlValueEncode($fields['email']['label']) ?></label>
+    <div class="col-md-3">
+      <input class="form-control email" id="email" name="email" size="30" type="email" maxlength="191" value="<?php echo HtmlValueEncode($data->email) ?>"<?php echo input_required($fields['email']) ?> />
+    </div>
+  </div><!-- /form-group -->
+
+  <div class="form-group">
+    <label class="col-md-2 control-label" for="status"><?php echo HtmlValueEncode($fields['status']['label']) ?></label>
+    <div class="col-md-10">
+      <?php bs3_html_checkboxes('radio', $fields['status']['list'], 'status', $data->status) ?>
+    </div>
+  </div><!-- /form-group -->
+
+  <?php if ('Admin' === get_class($data)): ?>
+  <div class="form-group" id="adminPerm">
+    <label class="col-md-2 control-label" for="menu"><?php echo _e('Admin Permissions') ?></label>
+    <div class="col-md-10">
+      <label class="checkbox-inline nowrap"><input data-toggle="checkbox" data-parent="div.col-md-10:first" name="tgAllPerms" type="checkbox" /><?php echo _e('Select All') ?></label><br />
+      <?php nested_html_checkboxes('checkbox', $menu_list, 'permissions', $data->permissions, ' class="select" data-toggle="checkbox" data-parent="li:first" data-active-parents') ?>
+      </ul>
+    </div>
+  </div><!-- /form-group -->
+  <?php endif ?>
+
+  <div class="form-group">
+    <label class="col-md-2 control-label"><?php echo _e('Last Login at') ?></label>
+    <div class="col-md-10">
+      <p class="form-control-static"><?php echo ($data->last_login ? $data->last_login : _e('Never Logged In')) ?></p>
+    </div>
+  </div><!-- /form-group -->
+
+  <div class="form-group">
+    <div class="col-md-offset-2 col-md-10">
+      <button type="submit" class="btn btn-success" name="action" value="save"><?php echo _e('Save') ?></button>
+    </div>
+  </div>
+</form>

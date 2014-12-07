@@ -161,9 +161,13 @@ function get_user_ip()
  */
 function get_domain_url()
 {
-    $is_ssl = isset($_REQUEST['is_ssl']) ? $_REQUEST['is_ssl'] : is_ssl();
-    $protocol = $is_ssl ? 'https://' : 'http://';
-    return $protocol . $_SERVER['HTTP_HOST'];
+    static $url = NULL;
+    if (NULL === $url) {
+        $is_ssl = isset($_REQUEST['is_ssl']) ? $_REQUEST['is_ssl'] : is_ssl();
+        $protocol = $is_ssl ? 'https://' : 'http://';
+        $url = $protocol . $_SERVER['HTTP_HOST'];
+    }
+    return $url;
 }
 /**
  * 網址重定向
@@ -537,7 +541,7 @@ function breadcrumbs($path, $linkCurrent=false, $beforeText=NULL)
         }
     }
 
-    echo '<ul class="breadcrumb">';
+    echo '<ul class="breadcrumb no-margin">';
     if ( $beforeText) {
         echo '<li>', HtmlValueEncode($beforeText), '</li>';
     }

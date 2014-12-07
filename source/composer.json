@@ -2,13 +2,16 @@
   "repositories": [
       {
           "type": "vcs",
-          "url": "git@ubuntudev:beata/pomo.git"
+          "url": "https://github.com/beata/pomo.git",
+          "config": {
+            "preferred-install": "dist"
+          }
       }
   ],
   "require": {
-    "php": ">=5.1",
-    "beata/pomo": "dev-master",
-    "beata/upgradephp": "v18.1.0",
-    "ezyang/htmlpurifier": "v4.5"
+    "php": ">=5.3",
+    "beata/pomo": "1.0.0",
+    "ezyang/htmlpurifier": "4.6.0",
+    "phpoffice/phpexcel": "1.8.0"
   }
 }

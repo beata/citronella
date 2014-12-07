@@ -1,0 +1,10 @@
+.disable-bootstrap-responsive(@container-width)
+{
+    html, body {
+        min-width: @container-width;
+    }
+    .container {
+        max-width: none !important;
+        width: @container-width;
+    }
+}
